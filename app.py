@@ -34,6 +34,7 @@ st.markdown("""
         padding: 1rem;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         text-align: center;
+        margin-bottom: 1rem;
     }
     .kpi-value {
         font-size: 1.8rem;
@@ -88,6 +89,10 @@ st.markdown("""
         background-color: #1E3A8A !important;
         color: white !important;
     }
+    
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -292,23 +297,10 @@ def main():
             st.error("No data loaded or empty dataset. Please check your data file.")
             return
         
-        # Debug info about the data - helpful for troubleshooting
-        st.sidebar.subheader("Data Information")
-        st.sidebar.write(f"Number of records: {len(df)}")
-        st.sidebar.write("Columns found:")
-        st.sidebar.write(df.columns.tolist())
-        
-        # If we have date info, show the date range
-        if 'Invoice_Date' in df.columns:
-            date_min = df['Invoice_Date'].min() if not df['Invoice_Date'].isna().all() else None
-            date_max = df['Invoice_Date'].max() if not df['Invoice_Date'].isna().all() else None
-            if date_min and date_max:
-                st.sidebar.write(f"Date range: {date_min.date()} to {date_max.date()}")
-        
         # Find payment column - crucial for calculations
         payment_col = get_payment_column(df)
         if payment_col:
-            st.sidebar.success(f"Using payment column: {payment_col}")
+            st.sidebar.success(f"Using payment column: {payment_col}", icon="✅")
         else:
             st.sidebar.warning("No payment column found, will calculate from other data.")
         
@@ -492,6 +484,121 @@ def main():
                 <div class='kpi-card'>
                     <p class='kpi-title'>Collection Rate</p>
                     <p class='kpi-value {collection_color}'>{format_percent(collection_rate)}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Origination Metrics Section
+            st.markdown("<h3>Originator Performance Metrics</h3>", unsafe_allow_html=True)
+
+            # Calculate origination metrics
+            originator_metrics = {}
+            try:
+                if 'Originator' in df_filtered.columns:
+                    # Total unique originators
+                    total_originators = df_filtered['Originator'].nunique()
+                    originator_metrics['total_originators'] = total_originators
+                    
+                    # Revenue per originator
+                    if 'Invoice_Total_in_USD' in df_filtered.columns:
+                        total_revenue = df_filtered['Invoice_Total_in_USD'].sum()
+                        avg_revenue_per_originator = total_revenue / total_originators if total_originators > 0 else 0
+                        originator_metrics['avg_revenue_per_originator'] = avg_revenue_per_originator
+                        
+                        # Top originators by revenue
+                        top_originators = df_filtered.groupby('Originator')['Invoice_Total_in_USD'].sum().reset_index()
+                        top_originators = top_originators.sort_values('Invoice_Total_in_USD', ascending=False)
+                        
+                        if not top_originators.empty:
+                            top_3_originators = top_originators.head(3)
+                            for i, row in enumerate(top_3_originators.itertuples(), 1):
+                                originator_metrics[f'top_{i}_originator'] = row.Originator
+                                originator_metrics[f'top_{i}_revenue'] = row.Invoice_Total_in_USD
+                                originator_metrics[f'top_{i}_percent'] = (row.Invoice_Total_in_USD / total_revenue * 100) if total_revenue > 0 else 0
+                    
+                    # Originator retention
+                    if 'Invoice_Date' in df_filtered.columns:
+                        # Calculate first and last appearance of each originator
+                        originator_dates = df_filtered.groupby('Originator')['Invoice_Date'].agg(['min', 'max']).reset_index()
+                        originator_dates.columns = ['Originator', 'First_Date', 'Last_Date']
+                        
+                        # Calculate tenure in days
+                        originator_dates['Tenure_Days'] = (originator_dates['Last_Date'] - originator_dates['First_Date']).dt.days
+                        
+                        # Count originators with tenure > 365 days (1 year)
+                        long_term_originators = len(originator_dates[originator_dates['Tenure_Days'] > 365])
+                        retention_rate = (long_term_originators / total_originators * 100) if total_originators > 0 else 0
+                        originator_metrics['retention_rate'] = retention_rate
+                        
+                        # Calculate month-over-month growth
+                        df_filtered['YearMonth'] = df_filtered['Invoice_Date'].dt.strftime('%Y-%m')
+                        monthly_originators = df_filtered.groupby('YearMonth')['Originator'].nunique().reset_index()
+                        monthly_originators.columns = ['YearMonth', 'Count']
+                        monthly_originators = monthly_originators.sort_values('YearMonth')
+                        
+                        if len(monthly_originators) > 1:
+                            current_month = monthly_originators.iloc[-1]['Count']
+                            previous_month = monthly_originators.iloc[-2]['Count']
+                            mom_growth = ((current_month - previous_month) / previous_month * 100) if previous_month > 0 else 0
+                            originator_metrics['mom_growth'] = mom_growth
+            except Exception as e:
+                st.warning(f"Error calculating origination metrics: {str(e)}")
+
+            # Display origination metrics as cards
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.markdown(f"""
+                <div class='kpi-card'>
+                    <p class='kpi-title'>Total Originators</p>
+                    <p class='kpi-value'>{originator_metrics.get('total_originators', 0)}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.markdown(f"""
+                <div class='kpi-card'>
+                    <p class='kpi-title'>Avg Revenue per Originator</p>
+                    <p class='kpi-value'>{format_currency(originator_metrics.get('avg_revenue_per_originator', 0))}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col2:
+                # Top performers
+                st.markdown(f"""
+                <div class='kpi-card'>
+                    <p class='kpi-title'>Top Originator</p>
+                    <p class='kpi-value'>{originator_metrics.get('top_1_originator', 'N/A')}</p>
+                    <p>{format_currency(originator_metrics.get('top_1_revenue', 0))} ({originator_metrics.get('top_1_percent', 0):.1f}%)</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.markdown(f"""
+                <div class='kpi-card'>
+                    <p class='kpi-title'>#2 Originator</p>
+                    <p class='kpi-value'>{originator_metrics.get('top_2_originator', 'N/A')}</p>
+                    <p>{format_currency(originator_metrics.get('top_2_revenue', 0))} ({originator_metrics.get('top_2_percent', 0):.1f}%)</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col3:
+                # Retention and growth
+                retention_color = get_kpi_color(originator_metrics.get('retention_rate', 0), (50, 75))
+                st.markdown(f"""
+                <div class='kpi-card'>
+                    <p class='kpi-title'>Originator Retention Rate</p>
+                    <p class='kpi-value {retention_color}'>{originator_metrics.get('retention_rate', 0):.1f}%</p>
+                    <p>% with 1+ year tenure</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # MoM growth
+                mom_value = originator_metrics.get('mom_growth', 0)
+                mom_color = "green-text" if mom_value > 0 else "red-text" if mom_value < 0 else ""
+                mom_sign = "+" if mom_value > 0 else ""
+                st.markdown(f"""
+                <div class='kpi-card'>
+                    <p class='kpi-title'>Month-over-Month Growth</p>
+                    <p class='kpi-value {mom_color}'>{mom_sign}{mom_value:.1f}%</p>
+                    <p>In originator count</p>
                 </div>
                 """, unsafe_allow_html=True)
             
