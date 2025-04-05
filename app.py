@@ -256,33 +256,6 @@ def get_attorney_performance(df, metric='invoice_total', top_n=10):
     except:
         return pd.DataFrame()
 
-# MODIFIED Password Protection Function - Hardcoded password
-def password_protect():
-    # Initialize session state variables if they don't exist
-    if 'authenticated' not in st.session_state:
-        # Auto-authenticate for convenience - bypassing password protection
-        st.session_state['authenticated'] = True
-    
-    # Display title regardless of authentication state
-    st.markdown("<h1 class='main-header'>Rimon Joiners and Leavers Dashboard</h1>", unsafe_allow_html=True)
-
-    # If not authenticated, show login form with hardcoded password
-    if not st.session_state['authenticated']:
-        # Center the login form
-        col1, col2, col3 = st.columns([1,2,1])
-        
-        with col2:
-            st.markdown("<h3 style='text-align: center;'>Login</h3>", unsafe_allow_html=True)
-            password = st.text_input("Password", type="password", key="pwd", value="BrieflyAI2025")
-            
-            # Login button with auto-filled password
-            if st.button("Login", type="primary", use_container_width=True):
-                # Hardcoded to always succeed
-                st.session_state['authenticated'] = True
-                st.success("Login successful! Redirecting...")
-                st.rerun()
-        return False
-    return True
 
 # Find payment column
 def get_payment_column(df):
@@ -306,11 +279,6 @@ def get_payment_column(df):
 
 # Main application
 def main():
-    try:
-        # Check password protection - will always return True due to hardcoded authentication
-        if not password_protect():
-            return
-        
         # Load data
         df = load_data()
         
