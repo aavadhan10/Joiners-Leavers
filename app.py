@@ -91,31 +91,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Password Protection Function
-def password_protect():
-    if 'authenticated' not in st.session_state:
-        st.session_state.authenticated = False
-    
-    if not st.session_state.authenticated:
-        st.markdown("<h1 class='main-header'>Rimon Joiners and Leavers Dashboard</h1>", unsafe_allow_html=True)
-        password = st.text_input("Enter Password", type="password")
-        if st.button("Login"):
-            if password == "BrieflyAI2025":
-                st.session_state.authenticated = True
-                st.experimental_rerun()
-            else:
-                st.error("Incorrect Password. Please try again.")
-        return False
-    return True
-
 # Safe function to get unique values from a column
 def safe_get_unique(df, column_name):
     try:
         if column_name in df.columns:
             values = df[column_name].dropna().unique().tolist()
-            if isinstance(values[0], str) if values else False:
-                return sorted(values)
-            return sorted(values, key=lambda x: str(x))
+            if len(values) > 0:
+                if isinstance(values[0], str):
+                    return sorted(values)
+                return sorted(values, key=lambda x: str(x))
         return []
     except:
         return []
@@ -129,9 +113,6 @@ def load_data():
         
         # Cleanup column names - remove any leading/trailing whitespace
         df.columns = df.columns.str.strip()
-        
-        # Display info about loaded data
-        st.sidebar.success(f"Loaded {len(df)} records from CSV")
         
         # Clean data - handle currency symbols and convert to numeric
         money_columns = [
@@ -269,6 +250,34 @@ def get_attorney_performance(df, metric='invoice_total', top_n=10):
     except:
         return pd.DataFrame()
 
+# Password Protection Function - FIXED
+def password_protect():
+    # Set title in both authentication and main screens
+    st.markdown("<h1 class='main-header'>Rimon Joiners and Leavers Dashboard</h1>", unsafe_allow_html=True)
+    
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+    
+    if not st.session_state.authenticated:
+        # Use columns to center the login form
+        col1, col2, col3 = st.columns([1,2,1])
+        
+        with col2:
+            st.markdown("<h3 style='text-align: center;'>Login</h3>", unsafe_allow_html=True)
+            password = st.text_input("Password", type="password", key="password_input")
+            
+            # More prominent login button
+            login_clicked = st.button("Login", type="primary", key="login_button", use_container_width=True)
+            
+            if login_clicked:
+                if password == "BrieflyAI2025":
+                    st.session_state.authenticated = True
+                    st.rerun()  # Use st.rerun() instead of st.experimental_rerun()
+                else:
+                    st.error("Incorrect Password. Please try again.")
+        return False
+    return True
+
 # Main application
 def main():
     try:
@@ -294,58 +303,74 @@ def main():
             if date_min and date_max:
                 st.sidebar.write(f"Date range: {date_min.date()} to {date_max.date()}")
         
-        # Set up the dashboard
-        st.markdown("<h1 class='main-header'>Rimon Joiners and Leavers Dashboard</h1>", unsafe_allow_html=True)
+        # ===== SIDEBAR FILTERS =====
+        st.sidebar.markdown("## 🔧 Filters")
         
-        # Global Filters Section
-        with st.expander("🔧 Filters", expanded=True):
-            col1, col2, col3 = st.columns(3)
-            
-            # Date range filter
-            df_filtered = df.copy()
-            
-            if 'Invoice_Date' in df.columns and not df['Invoice_Date'].isna().all():
+        # Initialize filtered dataframe
+        df_filtered = df.copy()
+        
+        # Date range filter
+        if 'Invoice_Date' in df.columns and not df['Invoice_Date'].isna().all():
+            try:
                 min_date = df['Invoice_Date'].min()
                 max_date = df['Invoice_Date'].max()
                 
                 if pd.notna(min_date) and pd.notna(max_date):
-                    with col1:
-                        try:
-                            date_range = st.date_input(
-                                "Date Range",
-                                value=(min_date.date(), max_date.date()),
-                                min_value=min_date.date(),
-                                max_value=max_date.date()
-                            )
-                            
-                            if len(date_range) == 2:
-                                start_date, end_date = date_range
-                                df_filtered = df[(df['Invoice_Date'].dt.date >= start_date) & 
-                                                (df['Invoice_Date'].dt.date <= end_date)]
-                        except:
-                            st.warning("Could not apply date filter")
-            
-            # Client filter - Use safe function to avoid errors
-            with col2:
-                try:
-                    clients = ['All'] + safe_get_unique(df, 'Client')
-                    selected_client = st.selectbox("Client", options=clients, index=0)
+                    date_range = st.sidebar.date_input(
+                        "Date Range",
+                        value=(min_date.date(), max_date.date()),
+                        min_value=min_date.date(),
+                        max_value=max_date.date()
+                    )
                     
-                    if selected_client != 'All' and 'Client' in df.columns:
-                        df_filtered = df_filtered[df_filtered['Client'] == selected_client]
-                except:
-                    st.warning("Could not apply client filter")
+                    if len(date_range) == 2:
+                        start_date, end_date = date_range
+                        df_filtered = df[(df['Invoice_Date'].dt.date >= start_date) & 
+                                        (df['Invoice_Date'].dt.date <= end_date)]
+            except Exception as e:
+                st.sidebar.warning(f"Could not apply date filter: {str(e)}")
+        
+        # Client filter
+        try:
+            clients = ['All'] + safe_get_unique(df, 'Client')
+            selected_client = st.sidebar.selectbox("Client", options=clients, index=0)
             
-            # Attorney filter - Use safe function to avoid errors
-            with col3:
-                try:
-                    attorneys = ['All'] + safe_get_unique(df, 'Originator')
-                    selected_attorney = st.selectbox("Attorney", options=attorneys, index=0)
-                    
-                    if selected_attorney != 'All' and 'Originator' in df.columns:
-                        df_filtered = df_filtered[df_filtered['Originator'] == selected_attorney]
-                except:
-                    st.warning("Could not apply attorney filter")
+            if selected_client != 'All' and 'Client' in df.columns:
+                df_filtered = df_filtered[df_filtered['Client'] == selected_client]
+        except Exception as e:
+            st.sidebar.warning(f"Could not apply client filter: {str(e)}")
+        
+        # Attorney filter
+        try:
+            attorneys = ['All'] + safe_get_unique(df, 'Originator')
+            selected_attorney = st.sidebar.selectbox("Attorney", options=attorneys, index=0)
+            
+            if selected_attorney != 'All' and 'Originator' in df.columns:
+                df_filtered = df_filtered[df_filtered['Originator'] == selected_attorney]
+        except Exception as e:
+            st.sidebar.warning(f"Could not apply attorney filter: {str(e)}")
+        
+        # Status filter
+        try:
+            if 'Invoice Status' in df.columns:
+                statuses = ['All'] + safe_get_unique(df, 'Invoice Status')
+                selected_status = st.sidebar.selectbox("Invoice Status", options=statuses, index=0)
+                
+                if selected_status != 'All':
+                    df_filtered = df_filtered[df_filtered['Invoice Status'] == selected_status]
+        except Exception as e:
+            st.sidebar.warning(f"Could not apply status filter: {str(e)}")
+        
+        # Office/Team filter
+        try:
+            if 'Accounting Entity' in df.columns:
+                entities = ['All'] + safe_get_unique(df, 'Accounting Entity')
+                selected_entity = st.sidebar.selectbox("Office/Team", options=entities, index=0)
+                
+                if selected_entity != 'All':
+                    df_filtered = df_filtered[df_filtered['Accounting Entity'] == selected_entity]
+        except Exception as e:
+            st.sidebar.warning(f"Could not apply office filter: {str(e)}")
         
         # Main Dashboard Tabs
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -915,12 +940,12 @@ def main():
             
             # Office/Team filter
             if 'Accounting Entity' in df_filtered.columns:
-                st.subheader("Filter by Office/Team")
+                st.subheader("Performance by Office/Team")
                 
                 try:
                     # Get unique offices
                     offices = ['All'] + safe_get_unique(df_filtered, 'Accounting Entity')
-                    selected_office = st.selectbox("Select Office/Team", options=offices)
+                    selected_office = st.selectbox("Select Office/Team", options=offices, key="office_dropdown")
                     
                     if selected_office != 'All':
                         # Filter by selected office
@@ -969,59 +994,12 @@ def main():
             # Create a searchable, filterable data table
             st.subheader("Searchable Invoice Table")
             
-            # Set up filters
-            col1, col2, col3 = st.columns(3)
-            
+            # Apply any additional filters specific to this tab
             filtered_invoices = df_filtered.copy()
-            
-            with col1:
-                try:
-                    # Status filter
-                    if 'Invoice Status' in filtered_invoices.columns:
-                        status_options = ['All'] + safe_get_unique(filtered_invoices, 'Invoice Status')
-                        selected_status = st.selectbox("Invoice Status", status_options)
-                        
-                        if selected_status != 'All':
-                            filtered_invoices = filtered_invoices[filtered_invoices['Invoice Status'] == selected_status]
-                    else:
-                        st.info("Status filter not available")
-                except:
-                    st.warning("Could not create status filter")
-            
-            with col2:
-                try:
-                    # Amount range filter
-                    if 'Invoice_Total_in_USD' in filtered_invoices.columns:
-                        min_amount = st.number_input(
-                            "Min Amount", 
-                            min_value=0.0, 
-                            value=0.0
-                        )
-                        
-                        filtered_invoices = filtered_invoices[filtered_invoices['Invoice_Total_in_USD'] >= min_amount]
-                    else:
-                        st.info("Amount filter not available")
-                except:
-                    st.warning("Could not create amount filter")
-            
-            with col3:
-                try:
-                    # Max amount filter
-                    if 'Invoice_Total_in_USD' in filtered_invoices.columns:
-                        max_val = float(filtered_invoices['Invoice_Total_in_USD'].max()) if not filtered_invoices.empty else 10000.0
-                        max_amount = st.number_input(
-                            "Max Amount", 
-                            min_value=0.0, 
-                            value=max_val
-                        )
-                        
-                        filtered_invoices = filtered_invoices[filtered_invoices['Invoice_Total_in_USD'] <= max_amount]
-                except:
-                    st.warning("Could not create max amount filter")
             
             # Search box
             try:
-                search_term = st.text_input("Search (Client, Matter, Invoice Number)")
+                search_term = st.text_input("Search (Client, Matter, Invoice Number)", key="invoice_search")
                 
                 if search_term:
                     # Create search mask
