@@ -250,7 +250,34 @@ def get_attorney_performance(df, metric='invoice_total', top_n=10):
     except:
         return pd.DataFrame()
 
+# FIXED Password Protection Function
+def password_protect():
+    # Initialize session state variables if they don't exist
+    if 'authenticated' not in st.session_state:
+        st.session_state['authenticated'] = False
+    
+    # Display title regardless of authentication state
+    st.markdown("<h1 class='main-header'>Rimon Joiners and Leavers Dashboard</h1>", unsafe_allow_html=True)
 
+    # If not authenticated, show login form
+    if not st.session_state['authenticated']:
+        # Center the login form
+        col1, col2, col3 = st.columns([1,2,1])
+        
+        with col2:
+            st.markdown("<h3 style='text-align: center;'>Login</h3>", unsafe_allow_html=True)
+            password = st.text_input("Password", type="password", key="pwd")
+            
+            # Login button
+            if st.button("Login", type="primary", use_container_width=True):
+                if password == "BrieflyAI2025":
+                    st.session_state['authenticated'] = True
+                    st.success("Login successful! Redirecting...")
+                    st.rerun()
+                else:
+                    st.error("Incorrect password. Please try again.")
+        return False
+    return True
 
 # Find payment column
 def get_payment_column(df):
@@ -274,6 +301,10 @@ def get_payment_column(df):
 
 # Main application
 def main():
+    try:
+        # Check password protection
+        if not password_protect():
+            return
         
         # Load data
         df = load_data()
