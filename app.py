@@ -114,6 +114,10 @@ def load_data():
         # Cleanup column names - remove any leading/trailing whitespace
         df.columns = df.columns.str.strip()
         
+        # Fix the TTM column if it exists
+        if 'TTM?' in df.columns:
+            df.rename(columns={'TTM?': 'TTM'}, inplace=True)
+            
         # Clean data - handle currency symbols and convert to numeric
         money_columns = [
             'Invoice_Total_in_USD', 'Invoice_Labor_Total_in_USD', 
@@ -140,11 +144,7 @@ def load_data():
                     df[col] = pd.to_datetime(df[col], errors='coerce')
                 except Exception as e:
                     st.sidebar.warning(f"Could not convert {col} to date: {e}")
-                
-        # Fix the TTM column if it exists
-        if 'TTM?' in df.columns:
-            df.rename(columns={'TTM?': 'TTM'}, inplace=True)
-            
+        
         return df
     except Exception as e:
         st.error(f"Error loading data: {e}")
@@ -250,33 +250,54 @@ def get_attorney_performance(df, metric='invoice_total', top_n=10):
     except:
         return pd.DataFrame()
 
-# Password Protection Function - FIXED
+# FIXED Password Protection Function
 def password_protect():
-    # Set title in both authentication and main screens
-    st.markdown("<h1 class='main-header'>Rimon Joiners and Leavers Dashboard</h1>", unsafe_allow_html=True)
-    
+    # Initialize session state variables if they don't exist
     if 'authenticated' not in st.session_state:
-        st.session_state.authenticated = False
+        st.session_state['authenticated'] = False
     
-    if not st.session_state.authenticated:
-        # Use columns to center the login form
+    # Display title regardless of authentication state
+    st.markdown("<h1 class='main-header'>Rimon Joiners and Leavers Dashboard</h1>", unsafe_allow_html=True)
+
+    # If not authenticated, show login form
+    if not st.session_state['authenticated']:
+        # Center the login form
         col1, col2, col3 = st.columns([1,2,1])
         
         with col2:
             st.markdown("<h3 style='text-align: center;'>Login</h3>", unsafe_allow_html=True)
-            password = st.text_input("Password", type="password", key="password_input")
+            password = st.text_input("Password", type="password", key="pwd")
             
-            # More prominent login button
-            login_clicked = st.button("Login", type="primary", key="login_button", use_container_width=True)
-            
-            if login_clicked:
+            # Login button
+            if st.button("Login", type="primary", use_container_width=True):
                 if password == "BrieflyAI2025":
-                    st.session_state.authenticated = True
-                    st.rerun()  # Use st.rerun() instead of st.experimental_rerun()
+                    st.session_state['authenticated'] = True
+                    st.success("Login successful! Redirecting...")
+                    st.rerun()
                 else:
-                    st.error("Incorrect Password. Please try again.")
+                    st.error("Incorrect password. Please try again.")
         return False
     return True
+
+# Find payment column
+def get_payment_column(df):
+    # Check for exact column matches
+    payment_columns = [
+        'Payments_Applied_Against_Invoice_in_USD', 
+        ' Payments_Applied_Against_Invoice_in_USD ',  # Note the spaces
+        'Payments Received'
+    ]
+    
+    for col in payment_columns:
+        if col in df.columns:
+            return col
+    
+    # Fuzzy matching for payment-related columns
+    for col in df.columns:
+        if any(term in col.lower() for term in ['payment', 'paid', 'received']):
+            return col
+    
+    return None
 
 # Main application
 def main():
@@ -293,15 +314,25 @@ def main():
             st.error("No data loaded or empty dataset. Please check your data file.")
             return
         
-        # Display basic info about the data
+        # Debug info about the data - helpful for troubleshooting
         st.sidebar.subheader("Data Information")
         st.sidebar.write(f"Number of records: {len(df)}")
+        st.sidebar.write("Columns found:")
+        st.sidebar.write(df.columns.tolist())
         
+        # If we have date info, show the date range
         if 'Invoice_Date' in df.columns:
             date_min = df['Invoice_Date'].min() if not df['Invoice_Date'].isna().all() else None
             date_max = df['Invoice_Date'].max() if not df['Invoice_Date'].isna().all() else None
             if date_min and date_max:
                 st.sidebar.write(f"Date range: {date_min.date()} to {date_max.date()}")
+        
+        # Find payment column - crucial for calculations
+        payment_col = get_payment_column(df)
+        if payment_col:
+            st.sidebar.success(f"Using payment column: {payment_col}")
+        else:
+            st.sidebar.warning("No payment column found. Collection metrics will be zero.")
         
         # ===== SIDEBAR FILTERS =====
         st.sidebar.markdown("## 🔧 Filters")
@@ -391,23 +422,23 @@ def main():
             if 'Invoice_Total_in_USD' in df_filtered.columns:
                 total_invoiced = df_filtered['Invoice_Total_in_USD'].sum()
                 
-            # Find a payment column that exists
-            payment_col = None
-            for col in ['Payments_Applied_Against_Invoice_in_USD', 'Payments Received']:
-                if col in df_filtered.columns:
-                    payment_col = col
-                    break
-                    
-            if payment_col:
-                total_collected = df_filtered[payment_col].abs().sum()
+            if payment_col and payment_col in df_filtered.columns:
+                # Check if payment values are positive or negative
+                payment_values = df_filtered[payment_col].values
+                if payment_values.mean() > 0:
+                    # If payments are positive, we take them as is
+                    total_collected = df_filtered[payment_col].sum()
+                else:
+                    # If payments are negative (accounting convention), take absolute value
+                    total_collected = abs(df_filtered[payment_col].sum())
                 
             if 'Invoice_Balance_Due_in_USD' in df_filtered.columns:
                 outstanding_balance = df_filtered['Invoice_Balance_Due_in_USD'].sum()
                 
             if total_invoiced > 0:
                 collection_rate = (total_collected / total_invoiced * 100)
-        except:
-            pass
+        except Exception as e:
+            st.warning(f"Error calculating KPIs: {str(e)}")
             
         # 1. Summary Cards Tab
         with tab1:
@@ -460,16 +491,22 @@ def main():
                     
                     agg_dict = {'Invoice_Total_in_USD': 'sum'}
                     if payment_col:
-                        agg_dict[payment_col] = lambda x: abs(x.sum())
+                        agg_dict[payment_col] = 'sum'
                     if 'Invoice_Balance_Due_in_USD' in df_filtered.columns:
                         agg_dict['Invoice_Balance_Due_in_USD'] = 'sum'
                     
                     yearly_metrics = df_filtered.groupby('Year').agg(agg_dict).reset_index()
                     
                     # Calculate collection rate
-                    if payment_col and 'Invoice_Total_in_USD' in yearly_metrics.columns:
+                    if payment_col and payment_col in yearly_metrics.columns:
+                        # Handle payment direction (positive or negative)
+                        if yearly_metrics[payment_col].mean() < 0:
+                            yearly_metrics['Payments'] = yearly_metrics[payment_col].abs()
+                        else:
+                            yearly_metrics['Payments'] = yearly_metrics[payment_col]
+                            
                         yearly_metrics['Collection_Rate'] = yearly_metrics.apply(
-                            lambda row: (row[payment_col] / row['Invoice_Total_in_USD'] * 100) if row['Invoice_Total_in_USD'] > 0 else 0, 
+                            lambda row: (row['Payments'] / row['Invoice_Total_in_USD'] * 100) if row['Invoice_Total_in_USD'] > 0 else 0, 
                             axis=1
                         )
                     
@@ -486,7 +523,7 @@ def main():
                         
                         fig.add_trace(go.Bar(
                             x=yearly_metrics['Year'],
-                            y=yearly_metrics[payment_col],
+                            y=yearly_metrics['Payments'],
                             name='Total Collected',
                             marker_color='#10B981'
                         ))
@@ -672,15 +709,21 @@ def main():
             
             if ('Invoice_Date' in df_filtered.columns and 
                 'Invoice_Total_in_USD' in df_filtered.columns and
-                payment_col):
+                payment_col and payment_col in df_filtered.columns):
                 try:
                     # Group by month
                     monthly_paid = df_filtered.groupby('YearMonth').agg({
                         'Invoice_Total_in_USD': 'sum',
-                        payment_col: lambda x: abs(x.sum())
+                        payment_col: 'sum'
                     }).reset_index()
                     
-                    monthly_paid['Outstanding'] = monthly_paid['Invoice_Total_in_USD'] - monthly_paid[payment_col]
+                    # Handle payment direction (positive or negative)
+                    if monthly_paid[payment_col].mean() < 0:
+                        monthly_paid['Paid'] = monthly_paid[payment_col].abs()
+                    else:
+                        monthly_paid['Paid'] = monthly_paid[payment_col]
+                        
+                    monthly_paid['Outstanding'] = monthly_paid['Invoice_Total_in_USD'] - monthly_paid['Paid']
                     monthly_paid = monthly_paid.sort_values('YearMonth')
                     
                     # Create stacked bar chart
@@ -688,7 +731,7 @@ def main():
                     
                     fig.add_trace(go.Bar(
                         x=monthly_paid['YearMonth'],
-                        y=monthly_paid[payment_col],
+                        y=monthly_paid['Paid'],
                         name='Paid',
                         marker_color='#10B981'
                     ))
@@ -759,17 +802,23 @@ def main():
             
             if ('Invoice_Date' in df_filtered.columns and 
                 'Invoice_Total_in_USD' in df_filtered.columns and
-                payment_col):
+                payment_col and payment_col in df_filtered.columns):
                 try:
                     # Group by month
                     monthly_targets = df_filtered.groupby('YearMonth').agg({
                         'Invoice_Total_in_USD': 'sum',
-                        payment_col: lambda x: abs(x.sum())
+                        payment_col: 'sum'
                     }).reset_index()
+                    
+                    # Handle payment direction
+                    if monthly_targets[payment_col].mean() < 0:
+                        monthly_targets['Payments'] = monthly_targets[payment_col].abs()
+                    else:
+                        monthly_targets['Payments'] = monthly_targets[payment_col]
                     
                     # Create target as 90% of invoice total
                     monthly_targets['Target'] = monthly_targets['Invoice_Total_in_USD'] * 0.9
-                    monthly_targets['Achievement'] = (monthly_targets[payment_col] / monthly_targets['Target'] * 100).clip(0, 100)
+                    monthly_targets['Achievement'] = (monthly_targets['Payments'] / monthly_targets['Target'] * 100).clip(0, 100)
                     monthly_targets = monthly_targets.sort_values('YearMonth')
                     
                     # Create color-coded bar chart
@@ -986,6 +1035,84 @@ def main():
                     st.warning(f"Could not filter by office: {str(e)}")
             else:
                 st.warning("Office/Team information not available")
+            
+            # Attorney Retention Analysis
+            st.subheader("Attorney Retention Analysis")
+            
+            if 'Originator' in df_filtered.columns and 'Invoice_Date' in df_filtered.columns:
+                try:
+                    # Calculate first and last appearance of each attorney
+                    first_appearance = df_filtered.groupby('Originator')['Invoice_Date'].min().reset_index()
+                    first_appearance.columns = ['Attorney', 'First_Invoice_Date']
+                    
+                    last_appearance = df_filtered.groupby('Originator')['Invoice_Date'].max().reset_index()
+                    last_appearance.columns = ['Attorney', 'Last_Invoice_Date']
+                    
+                    retention_data = pd.merge(first_appearance, last_appearance, on='Attorney')
+                    
+                    # Calculate tenure in months
+                    retention_data['Tenure_Days'] = (retention_data['Last_Invoice_Date'] - retention_data['First_Invoice_Date']).dt.days
+                    retention_data['Tenure_Months'] = retention_data['Tenure_Days'] / 30
+                    
+                    # Consider attorneys present in the most recent 3 months as "currently active"
+                    latest_date = df_filtered['Invoice_Date'].max()
+                    threshold_date = latest_date - pd.Timedelta(days=90)
+                    retention_data['Still_Active'] = retention_data['Last_Invoice_Date'] >= threshold_date
+                    
+                    # Display retention summary
+                    st.write("Attorney Retention Summary:")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        total_attorneys = len(retention_data)
+                        active_attorneys = retention_data['Still_Active'].sum()
+                        retention_rate = (active_attorneys / total_attorneys * 100) if total_attorneys > 0 else 0
+                        
+                        st.metric("Total Attorneys", f"{total_attorneys}")
+                        st.metric("Currently Active", f"{active_attorneys}")
+                        st.metric("Retention Rate", f"{retention_rate:.1f}%")
+                    
+                    with col2:
+                        # Tenure distribution
+                        tenure_bins = [0, 3, 6, 12, 24, 36, float('inf')]
+                        tenure_labels = ['0-3 months', '3-6 months', '6-12 months', '1-2 years', '2-3 years', '3+ years']
+                        retention_data['Tenure_Group'] = pd.cut(retention_data['Tenure_Months'], bins=tenure_bins, labels=tenure_labels)
+                        
+                        tenure_dist = retention_data.groupby('Tenure_Group').size().reset_index()
+                        tenure_dist.columns = ['Tenure', 'Count']
+                        
+                        # Create tenure distribution chart
+                        fig = px.bar(
+                            tenure_dist,
+                            x='Tenure',
+                            y='Count',
+                            title='Attorney Tenure Distribution',
+                            color='Count',
+                            color_continuous_scale='Blues'
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    with col3:
+                        # Active vs inactive attorneys
+                        status_counts = retention_data['Still_Active'].value_counts().reset_index()
+                        status_counts.columns = ['Status', 'Count']
+                        status_counts['Status'] = status_counts['Status'].map({True: 'Active', False: 'Inactive'})
+                        
+                        fig = px.pie(
+                            status_counts,
+                            values='Count',
+                            names='Status',
+                            title='Attorney Status',
+                            color='Status',
+                            color_discrete_map={'Active': '#10B981', 'Inactive': '#EF4444'}
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.warning(f"Could not analyze attorney retention: {str(e)}")
+            else:
+                st.warning("Missing required columns for retention analysis")
         
         # 4. Invoice Explorer Tab
         with tab4:
