@@ -93,6 +93,47 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    
+    /* New styles for personnel table */
+    .personnel-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+    .personnel-table th {
+        background-color: #1E3A8A;
+        color: white;
+        text-align: left;
+        padding: 10px;
+    }
+    .personnel-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #E5E7EB;
+    }
+    .personnel-table tr:nth-child(even) {
+        background-color: #f8f9fa;
+    }
+    .join-row {
+        background-color: rgba(16, 185, 129, 0.1) !important;
+    }
+    .leave-row {
+        background-color: rgba(239, 68, 68, 0.1) !important;
+    }
+    .badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .badge-join {
+        background-color: #10B981;
+        color: white;
+    }
+    .badge-leave {
+        background-color: #EF4444;
+        color: white;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -155,6 +196,79 @@ def load_data():
         st.error(f"Error loading data: {e}")
         # Return empty DataFrame with basic columns
         return pd.DataFrame(columns=['Invoice_Number'])
+
+# Load manual joiners and leavers data
+def load_personnel_changes():
+    # Q4 2024 Leavers
+    leavers_q4_2024 = [
+        {"name": "Matthew Poppe", "date": "10/16/2024", "notes": ""},
+        {"name": "Marc Kaufman", "date": "11/13/2024", "notes": ""},
+        {"name": "Steven Eichel", "date": "11/19/2024", "notes": ""},
+        {"name": "Chelsea Ellis", "date": "11/19/2024", "notes": "Did not originate"},
+        {"name": "Sam Finkelstein", "date": "11/19/2024", "notes": "Did not originate"},
+        {"name": "T. James Min", "date": "11/19/2024", "notes": ""},
+        {"name": "Jeffrey Fromm", "date": "11/21/2024", "notes": ""},
+        {"name": "David Mahoney", "date": "11/21/2024", "notes": ""},
+        {"name": "J Paul Gignac", "date": "12/2/2024", "notes": ""},
+        {"name": "Deborah Turofsky", "date": "12/5/2024", "notes": "Did not originate"},
+        {"name": "David Mittelman", "date": "12/18/2024", "notes": ""},
+        {"name": "Dale Rieger", "date": "12/20/2024", "notes": ""}
+    ]
+    
+    # Q1 2025 Leavers
+    leavers_q1_2025 = [
+        {"name": "Dror Futter", "date": "2/28/2025", "notes": ""},
+        {"name": "Leo Liu", "date": "3/1/2025", "notes": ""}
+    ]
+    
+    # Q4 2024 Joiners
+    joiners_q4_2024 = [
+        {"name": "Tim Kennedy", "date": "10/7/2024", "notes": "PCT Team Associate"},
+        {"name": "Patrick McCormick", "date": "10/15/2024", "notes": ""},
+        {"name": "Jake Mendoza", "date": "11/18/2024", "notes": "PCT Team Partner"},
+        {"name": "Sarah Challen McKee", "date": "11/18/2024", "notes": "PCT Team Associate"},
+        {"name": "Ruben Salcido Monreal", "date": "11/18/2024", "notes": "Associate"},
+        {"name": "Robert Pepple", "date": "12/2/2024", "notes": ""},
+        {"name": "Sydney Blomstrom", "date": "12/2/2024", "notes": "Associate"},
+        {"name": "Edwin Barkel", "date": "12/16/2024", "notes": "BOB shared with Hilary Wells"},
+        {"name": "Hilary Wells", "date": "12/16/2024", "notes": "BOB shared with Ed Barkel"}
+    ]
+    
+    # Q1 2025 Joiners
+    joiners_q1_2025 = [
+        {"name": "Ivan Moskowitz", "date": "1/6/2025", "notes": ""},
+        {"name": "Chip Fisher", "date": "2/3/2025", "notes": "PCT Team Counsel"},
+        {"name": "Lisel Ferguson", "date": "2/24/2025", "notes": ""},
+        {"name": "Hua Howard Wang", "date": "3/12/2025", "notes": ""}
+    ]
+    
+    # Create DataFrames
+    leavers_q4_df = pd.DataFrame(leavers_q4_2024)
+    leavers_q4_df['quarter'] = 'Q4 2024'
+    leavers_q4_df['type'] = 'Leaver'
+    
+    leavers_q1_df = pd.DataFrame(leavers_q1_2025)
+    leavers_q1_df['quarter'] = 'Q1 2025'
+    leavers_q1_df['type'] = 'Leaver'
+    
+    joiners_q4_df = pd.DataFrame(joiners_q4_2024)
+    joiners_q4_df['quarter'] = 'Q4 2024'
+    joiners_q4_df['type'] = 'Joiner'
+    
+    joiners_q1_df = pd.DataFrame(joiners_q1_2025)
+    joiners_q1_df['quarter'] = 'Q1 2025'
+    joiners_q1_df['type'] = 'Joiner'
+    
+    # Combine all data
+    personnel_changes = pd.concat([leavers_q4_df, leavers_q1_df, joiners_q4_df, joiners_q1_df])
+    
+    # Convert dates to datetime
+    personnel_changes['date'] = pd.to_datetime(personnel_changes['date'], format='%m/%d/%Y', errors='coerce')
+    
+    # Sort by date
+    personnel_changes = personnel_changes.sort_values('date')
+    
+    return personnel_changes
 
 # Download data as CSV
 def download_csv(df):
@@ -255,6 +369,72 @@ def get_attorney_performance(df, metric='invoice_total', top_n=10):
     except:
         return pd.DataFrame()
 
+# Function to display personnel changes table
+def display_personnel_table(personnel_df, quarter=None, change_type=None):
+    # Filter data if quarter or type is specified
+    filtered_df = personnel_df.copy()
+    
+    if quarter:
+        filtered_df = filtered_df[filtered_df['quarter'] == quarter]
+    
+    if change_type:
+        filtered_df = filtered_df[filtered_df['type'] == change_type]
+    
+    # Format date for display
+    filtered_df['formatted_date'] = filtered_df['date'].dt.strftime('%m/%d/%Y')
+    
+    # Sort by date
+    filtered_df = filtered_df.sort_values('date')
+    
+    # Generate HTML table
+    table_html = """
+    <table class="personnel-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    
+    for _, row in filtered_df.iterrows():
+        row_class = "join-row" if row['type'] == 'Joiner' else "leave-row"
+        badge_class = "badge-join" if row['type'] == 'Joiner' else "badge-leave"
+        
+        table_html += f"""
+        <tr class="{row_class}">
+            <td>{row['formatted_date']}</td>
+            <td>{row['name']}</td>
+            <td><span class="badge {badge_class}">{row['type']}</span></td>
+            <td>{row['notes']}</td>
+        </tr>
+        """
+    
+    table_html += """
+        </tbody>
+    </table>
+    """
+    
+    st.markdown(table_html, unsafe_allow_html=True)
+
+# Function to create personnel summary metrics
+def create_personnel_summary(personnel_df):
+    # Get counts by quarter and type
+    summary = personnel_df.groupby(['quarter', 'type']).size().unstack(fill_value=0).reset_index()
+    
+    if 'Joiner' not in summary.columns:
+        summary['Joiner'] = 0
+    if 'Leaver' not in summary.columns:
+        summary['Leaver'] = 0
+    
+    # Calculate net change
+    summary['Net Change'] = summary['Joiner'] - summary['Leaver']
+    
+    return summary
+
 # Removed password protection - simply display the title
 def display_title():
     # Display title
@@ -291,6 +471,9 @@ def main():
         
         # Load data
         df = load_data()
+        
+        # Load personnel changes data
+        personnel_changes = load_personnel_changes()
         
         # Check if data is loaded properly
         if df.empty:
@@ -374,12 +557,13 @@ def main():
             st.sidebar.warning(f"Could not apply office filter: {str(e)}")
         
         # Main Dashboard Tabs
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
             "📍 Summary", 
             "📈 Trends", 
             "👤 Attorney Performance", 
             "🧾 Invoice Explorer", 
-            "⏱️ Payment Behavior"
+            "⏱️ Payment Behavior",
+            "👥 Personnel Changes"
         ])
         
         # Calculate basic KPIs
@@ -487,1054 +671,1192 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
             
-            # Origination Metrics Section
-            st.markdown("<h3>Originator Performance Metrics</h3>", unsafe_allow_html=True)
-
-            # Calculate origination metrics
-            originator_metrics = {}
-            try:
-                if 'Originator' in df_filtered.columns:
-                    # Total unique originators
-                    total_originators = df_filtered['Originator'].nunique()
-                    originator_metrics['total_originators'] = total_originators
-                    
-                    # Revenue per originator
-                    if 'Invoice_Total_in_USD' in df_filtered.columns:
-                        total_revenue = df_filtered['Invoice_Total_in_USD'].sum()
-                        avg_revenue_per_originator = total_revenue / total_originators if total_originators > 0 else 0
-                        originator_metrics['avg_revenue_per_originator'] = avg_revenue_per_originator
-                        
-                        # Top originators by revenue
-                        top_originators = df_filtered.groupby('Originator')['Invoice_Total_in_USD'].sum().reset_index()
-                        top_originators = top_originators.sort_values('Invoice_Total_in_USD', ascending=False)
-                        
-                        if not top_originators.empty:
-                            top_3_originators = top_originators.head(3)
-                            for i, row in enumerate(top_3_originators.itertuples(), 1):
-                                originator_metrics[f'top_{i}_originator'] = row.Originator
-                                originator_metrics[f'top_{i}_revenue'] = row.Invoice_Total_in_USD
-                                originator_metrics[f'top_{i}_percent'] = (row.Invoice_Total_in_USD / total_revenue * 100) if total_revenue > 0 else 0
-                    
-                    # Originator retention
-                    if 'Invoice_Date' in df_filtered.columns:
-                        # Calculate first and last appearance of each originator
-                        originator_dates = df_filtered.groupby('Originator')['Invoice_Date'].agg(['min', 'max']).reset_index()
-                        originator_dates.columns = ['Originator', 'First_Date', 'Last_Date']
-                        
-                        # Calculate tenure in days
-                        originator_dates['Tenure_Days'] = (originator_dates['Last_Date'] - originator_dates['First_Date']).dt.days
-                        
-                        # Count originators with tenure > 365 days (1 year)
-                        long_term_originators = len(originator_dates[originator_dates['Tenure_Days'] > 365])
-                        retention_rate = (long_term_originators / total_originators * 100) if total_originators > 0 else 0
-                        originator_metrics['retention_rate'] = retention_rate
-                        
-                        # Calculate month-over-month growth
-                        df_filtered['YearMonth'] = df_filtered['Invoice_Date'].dt.strftime('%Y-%m')
-                        monthly_originators = df_filtered.groupby('YearMonth')['Originator'].nunique().reset_index()
-                        monthly_originators.columns = ['YearMonth', 'Count']
-                        monthly_originators = monthly_originators.sort_values('YearMonth')
-                        
-                        if len(monthly_originators) > 1:
-                            current_month = monthly_originators.iloc[-1]['Count']
-                            previous_month = monthly_originators.iloc[-2]['Count']
-                            mom_growth = ((current_month - previous_month) / previous_month * 100) if previous_month > 0 else 0
-                            originator_metrics['mom_growth'] = mom_growth
-            except Exception as e:
-                st.warning(f"Error calculating origination metrics: {str(e)}")
-
-            # Display origination metrics as cards
+            # Personnel Changes Summary Section
+            st.markdown("<h3>Recent Personnel Changes</h3>", unsafe_allow_html=True)
+            
+            # Calculate summary statistics
+            personnel_summary = create_personnel_summary(personnel_changes)
+            
+            # Display summary cards
             col1, col2, col3 = st.columns(3)
-
+            
             with col1:
-                st.markdown(f"""
-                <div class='kpi-card'>
-                    <p class='kpi-title'>Total Originators</p>
-                    <p class='kpi-value'>{originator_metrics.get('total_originators', 0)}</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.markdown(f"""
-                <div class='kpi-card'>
-                    <p class='kpi-title'>Avg Revenue per Originator</p>
-                    <p class='kpi-value'>{format_currency(originator_metrics.get('avg_revenue_per_originator', 0))}</p>
-                </div>
-                """, unsafe_allow_html=True)
-
+                # Q4 2024 summary
+                q4_data = personnel_summary[personnel_summary['quarter'] == 'Q4 2024']
+                if not q4_data.empty:
+                    joiners = q4_data['Joiner'].values[0]
+                    leavers = q4_data['Leaver'].values[0]
+                    net_change = q4_data['Net Change'].values[0]
+                    
+                    net_color = "green-text" if net_change > 0 else "red-text" if net_change < 0 else ""
+                    st.markdown(f"""
+                    <div class='kpi-card'>
+                        <p class='kpi-title'>Q4 2024 Summary</p>
+                        <p><span class="green-text">{joiners} Joiners</span> | <span class="red-text">{leavers} Leavers</span></p>
+                        <p class='kpi-value {net_color}'>{net_change:+d} Net Change</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
             with col2:
-                # Top performers
-                st.markdown(f"""
-                <div class='kpi-card'>
-                    <p class='kpi-title'>Top Originator</p>
-                    <p class='kpi-value'>{originator_metrics.get('top_1_originator', 'N/A')}</p>
-                    <p>{format_currency(originator_metrics.get('top_1_revenue', 0))} ({originator_metrics.get('top_1_percent', 0):.1f}%)</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.markdown(f"""
-                <div class='kpi-card'>
-                    <p class='kpi-title'>#2 Originator</p>
-                    <p class='kpi-value'>{originator_metrics.get('top_2_originator', 'N/A')}</p>
-                    <p>{format_currency(originator_metrics.get('top_2_revenue', 0))} ({originator_metrics.get('top_2_percent', 0):.1f}%)</p>
-                </div>
-                """, unsafe_allow_html=True)
+    # Q1 2025 summary
+    q1_data = personnel_summary[personnel_summary['quarter'] == 'Q1 2025']
+    if not q1_data.empty:
+        joiners = q1_data['Joiner'].values[0]
+        leavers = q1_data['Leaver'].values[0]
+        net_change = q1_data['Net Change'].values[0]
+        
+        net_color = "green-text" if net_change > 0 else "red-text" if net_change < 0 else ""
+        st.markdown(f"""
+        <div class='kpi-card'>
+            <p class='kpi-title'>Q1 2025 Summary</p>
+            <p><span class="green-text">{joiners} Joiners</span> | <span class="red-text">{leavers} Leavers</span></p>
+            <p class='kpi-value {net_color}'>{net_change:+d} Net Change</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-            with col3:
-                # Retention and growth
-                retention_color = get_kpi_color(originator_metrics.get('retention_rate', 0), (50, 75))
-                st.markdown(f"""
-                <div class='kpi-card'>
-                    <p class='kpi-title'>Originator Retention Rate</p>
-                    <p class='kpi-value {retention_color}'>{originator_metrics.get('retention_rate', 0):.1f}%</p>
-                    <p>% with 1+ year tenure</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # MoM growth
-                mom_value = originator_metrics.get('mom_growth', 0)
-                mom_color = "green-text" if mom_value > 0 else "red-text" if mom_value < 0 else ""
-                mom_sign = "+" if mom_value > 0 else ""
-                st.markdown(f"""
-                <div class='kpi-card'>
-                    <p class='kpi-title'>Month-over-Month Growth</p>
-                    <p class='kpi-value {mom_color}'>{mom_sign}{mom_value:.1f}%</p>
-                    <p>In originator count</p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # YoY Comparison
-            st.markdown("<h3>Year-over-Year Comparison</h3>", unsafe_allow_html=True)
-            
-            # Calculate YoY metrics if date information is available
-            if 'Invoice_Date' in df_filtered.columns and not df_filtered['Invoice_Date'].isna().all():
-                try:
-                    # Group by year and calculate metrics
-                    df_filtered['Year'] = df_filtered['Invoice_Date'].dt.year
-                    
-                    agg_dict = {'Invoice_Total_in_USD': 'sum'}
-                    if payment_col:
-                        agg_dict[payment_col] = 'sum'
-                    if 'Invoice_Balance_Due_in_USD' in df_filtered.columns:
-                        agg_dict['Invoice_Balance_Due_in_USD'] = 'sum'
-                    
-                    yearly_metrics = df_filtered.groupby('Year').agg(agg_dict).reset_index()
-                    
-                    # Calculate collection rate
-                    if payment_col and payment_col in yearly_metrics.columns:
-                        # Handle payment direction (positive or negative)
-                        if yearly_metrics[payment_col].mean() < 0:
-                            yearly_metrics['Payments'] = yearly_metrics[payment_col].abs()
-                        else:
-                            yearly_metrics['Payments'] = yearly_metrics[payment_col]
-                            
-                        yearly_metrics['Collection_Rate'] = yearly_metrics.apply(
-                            lambda row: (row['Payments'] / row['Invoice_Total_in_USD'] * 100) if row['Invoice_Total_in_USD'] > 0 else 0, 
-                            axis=1
-                        )
-                    
-                        # Create bar chart
-                        fig = go.Figure()
-                        
-                        # Add traces
-                        fig.add_trace(go.Bar(
-                            x=yearly_metrics['Year'],
-                            y=yearly_metrics['Invoice_Total_in_USD'],
-                            name='Total Invoiced',
-                            marker_color='#3B82F6'
-                        ))
-                        
-                        fig.add_trace(go.Bar(
-                            x=yearly_metrics['Year'],
-                            y=yearly_metrics['Payments'],
-                            name='Total Collected',
-                            marker_color='#10B981'
-                        ))
-                        
-                        fig.add_trace(go.Scatter(
-                            x=yearly_metrics['Year'],
-                            y=yearly_metrics['Collection_Rate'],
-                            name='Collection Rate (%)',
-                            mode='lines+markers',
-                            yaxis='y2',
-                            line=dict(color='#EF4444', width=3),
-                            marker=dict(size=10)
-                        ))
-                        
-                        # Update layout
-                        fig.update_layout(
-                            title='Year-over-Year Financial Performance',
-                            xaxis=dict(title='Year'),
-                            yaxis=dict(title='Amount (USD)', side='left'),
-                            yaxis2=dict(title='Collection Rate (%)', side='right', overlaying='y', range=[0, 100]),
-                            legend=dict(orientation='h', yanchor='bottom', y=1.02),
-                            barmode='group',
-                            height=500
-                        )
-                        
-                        st.plotly_chart(fig, use_container_width=True)
-                    else:
-                        st.warning("Missing required data for YoY comparison")
-                except Exception as e:
-                    st.warning(f"Could not generate Year-over-Year comparison: {str(e)}")
-            else:
-                st.warning("Date information is not available for year-over-year comparison.")
-            
-            # Joiners vs Leavers
-            st.markdown("<h3>Joiners vs Leavers Analysis</h3>", unsafe_allow_html=True)
-            
-            if 'Originator' in df_filtered.columns and 'Invoice_Date' in df_filtered.columns:
-                try:
-                    # Add year and month columns
-                    df_filtered['Year'] = df_filtered['Invoice_Date'].dt.year
-                    df_filtered['Month'] = df_filtered['Invoice_Date'].dt.month
-                    df_filtered['YearMonth'] = df_filtered['Invoice_Date'].dt.strftime('%Y-%m')
-                    
-                    # Get monthly attorney counts
-                    monthly_attorneys = df_filtered.groupby('YearMonth')['Originator'].nunique().reset_index()
-                    monthly_attorneys.columns = ['YearMonth', 'Attorney_Count']
-                    monthly_attorneys = monthly_attorneys.sort_values('YearMonth')
-                    
-                    if len(monthly_attorneys) > 1:
-                        # Calculate joiners and leavers
-                        monthly_attorneys['Previous_Count'] = monthly_attorneys['Attorney_Count'].shift(1)
-                        monthly_attorneys['Net_Change'] = monthly_attorneys['Attorney_Count'] - monthly_attorneys['Previous_Count']
-                        
-                        # Split into joiners and leavers for visualization
-                        monthly_attorneys['Joiners'] = monthly_attorneys['Net_Change'].apply(lambda x: max(0, x))
-                        monthly_attorneys['Leavers'] = monthly_attorneys['Net_Change'].apply(lambda x: abs(min(0, x)))
-                        
-                        # Create visualization
-                        fig = go.Figure()
-                        
-                        fig.add_trace(go.Bar(
-                            x=monthly_attorneys['YearMonth'],
-                            y=monthly_attorneys['Joiners'],
-                            name='Joiners',
-                            marker_color='#10B981'
-                        ))
-                        
-                        fig.add_trace(go.Bar(
-                            x=monthly_attorneys['YearMonth'],
-                            y=monthly_attorneys['Leavers'],
-                            name='Leavers',
-                            marker_color='#EF4444'
-                        ))
-                        
-                        fig.add_trace(go.Scatter(
-                            x=monthly_attorneys['YearMonth'],
-                            y=monthly_attorneys['Net_Change'],
-                            name='Net Change',
-                            mode='lines+markers',
-                            line=dict(color='#3B82F6', width=3),
-                            marker=dict(size=8)
-                        ))
-                        
-                        fig.update_layout(
-                            title='Monthly Joiners vs Leavers',
-                            xaxis=dict(title='Month', tickangle=45),
-                            yaxis=dict(title='Number of Attorneys'),
-                            barmode='group',
-                            legend=dict(orientation='h', yanchor='bottom', y=1.02),
-                            height=500
-                        )
-                        
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Calculate yearly summary
-                        yearly_attorneys = df_filtered.groupby('Year')['Originator'].nunique().reset_index()
-                        yearly_attorneys.columns = ['Year', 'Attorney_Count']
-                        yearly_attorneys = yearly_attorneys.sort_values('Year')
-                        
-                        if len(yearly_attorneys) > 1:
-                            yearly_attorneys['Previous_Count'] = yearly_attorneys['Attorney_Count'].shift(1)
-                            yearly_attorneys['Net_Change'] = yearly_attorneys['Attorney_Count'] - yearly_attorneys['Previous_Count']
-                            yearly_attorneys['Joiners'] = yearly_attorneys['Net_Change'].apply(lambda x: max(0, x))
-                            yearly_attorneys['Leavers'] = yearly_attorneys['Net_Change'].apply(lambda x: abs(min(0, x)))
-                            
-                            # Drop NaN rows
-                            yearly_attorneys = yearly_attorneys.dropna()
-                            
-                            if not yearly_attorneys.empty:
-                                st.subheader("Year-wise Trend")
-                                st.dataframe(yearly_attorneys[['Year', 'Attorney_Count', 'Joiners', 'Leavers', 'Net_Change']], use_container_width=True)
-                    else:
-                        st.warning("Not enough time periods to analyze joiners and leavers")
-                except Exception as e:
-                    st.warning(f"Could not analyze joiners and leavers: {str(e)}")
-            else:
-                st.warning("Missing required columns for joiners/leavers analysis")
-            
-            # Top & Bottom Performers
-            st.markdown("<h3>Top & Bottom Performers</h3>", unsafe_allow_html=True)
-            
-            try:
-                # Get performance data
-                top_billed = get_attorney_performance(df_filtered, metric='invoice_total', top_n=5)
-                
-                if not top_billed.empty:
-                    # Create visualization
-                    fig = px.bar(
-                        top_billed,
-                        x='Value',
-                        y='Attorney',
-                        color='Rank',
-                        orientation='h',
-                        title='Top & Bottom Attorneys by Billing',
-                        labels={'Value': 'Total Billed (USD)', 'Attorney': ''},
-                        color_discrete_map={'Top': '#10B981', 'Bottom': '#EF4444'}
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.warning("Not enough billing data for top performer analysis")
-                    
-            except Exception as e:
-                st.warning(f"Could not generate top performers chart: {str(e)}")
+with col3:
+    # Overall summary (Q4 2024 + Q1 2025)
+    total_joiners = personnel_summary['Joiner'].sum()
+    total_leavers = personnel_summary['Leaver'].sum()
+    total_net_change = total_joiners - total_leavers
+    
+    net_color = "green-text" if total_net_change > 0 else "red-text" if total_net_change < 0 else ""
+    st.markdown(f"""
+    <div class='kpi-card'>
+        <p class='kpi-title'>Overall Summary (Q4 2024-Q1 2025)</p>
+        <p><span class="green-text">{total_joiners} Joiners</span> | <span class="red-text">{total_leavers} Leavers</span></p>
+        <p class='kpi-value {net_color}'>{total_net_change:+d} Net Change</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# Recent personnel changes visualization
+st.subheader("Recent Personnel Activity")
+
+# Create visualization
+fig = go.Figure()
+
+# Data for joiners by month
+personnel_changes['month'] = personnel_changes['date'].dt.strftime('%Y-%m')
+monthly_joiners = personnel_changes[personnel_changes['type'] == 'Joiner'].groupby('month').size().reset_index()
+monthly_joiners.columns = ['month', 'count']
+
+monthly_leavers = personnel_changes[personnel_changes['type'] == 'Leaver'].groupby('month').size().reset_index()
+monthly_leavers.columns = ['month', 'count']
+
+# Add joiners and leavers bars
+fig.add_trace(go.Bar(
+    x=monthly_joiners['month'],
+    y=monthly_joiners['count'],
+    name='Joiners',
+    marker_color='#10B981'
+))
+
+fig.add_trace(go.Bar(
+    x=monthly_leavers['month'],
+    y=monthly_leavers['count'],
+    name='Leavers',
+    marker_color='#EF4444'
+))
+
+# Update layout
+fig.update_layout(
+    title='Monthly Personnel Changes (Q4 2024-Q1 2025)',
+    xaxis=dict(title='Month'),
+    yaxis=dict(title='Number of Personnel'),
+    barmode='group',
+    height=400
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+# Link to detailed personnel tab
+st.markdown("""
+<div style="text-align: center; margin-top: 20px;">
+    <p>For detailed personnel changes, see the <strong>Personnel Changes</strong> tab</p>
+</div>
+""", unsafe_allow_html=True)
+
+# Origination Metrics Section
+st.markdown("<h3>Originator Performance Metrics</h3>", unsafe_allow_html=True)
+
+# Calculate origination metrics
+originator_metrics = {}
+try:
+    if 'Originator' in df_filtered.columns:
+        # Total unique originators
+        total_originators = df_filtered['Originator'].nunique()
+        originator_metrics['total_originators'] = total_originators
         
-        # 2. Trends Dashboard Tab
-        with tab2:
-            st.markdown("<h2 class='section-header'>📈 Trends Dashboard</h2>", unsafe_allow_html=True)
+        # Revenue per originator
+        if 'Invoice_Total_in_USD' in df_filtered.columns:
+            total_revenue = df_filtered['Invoice_Total_in_USD'].sum()
+            avg_revenue_per_originator = total_revenue / total_originators if total_originators > 0 else 0
+            originator_metrics['avg_revenue_per_originator'] = avg_revenue_per_originator
             
-            # Revenue over time
-            st.subheader("Revenue Over Time")
+            # Top originators by revenue
+            top_originators = df_filtered.groupby('Originator')['Invoice_Total_in_USD'].sum().reset_index()
+            top_originators = top_originators.sort_values('Invoice_Total_in_USD', ascending=False)
             
-            if 'Invoice_Date' in df_filtered.columns and 'Invoice_Total_in_USD' in df_filtered.columns:
-                try:
-                    # Group by month
-                    df_filtered['YearMonth'] = df_filtered['Invoice_Date'].dt.strftime('%Y-%m')
-                    monthly_revenue = df_filtered.groupby('YearMonth')['Invoice_Total_in_USD'].sum().reset_index()
-                    monthly_revenue = monthly_revenue.sort_values('YearMonth')
-                    
-                    # Create line chart
-                    fig = px.line(
-                        monthly_revenue, 
-                        x='YearMonth', 
-                        y='Invoice_Total_in_USD',
-                        markers=True,
-                        labels={'Invoice_Total_in_USD': 'Amount (USD)', 'YearMonth': 'Month'},
-                        title='Monthly Revenue'
-                    )
-                    
-                    fig.update_layout(
-                        xaxis_tickangle=45,
-                        height=500
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.warning(f"Could not generate revenue trend: {str(e)}")
-            else:
-                st.warning("Missing required columns for revenue trend")
-            
-            # Paid vs Outstanding
-            st.subheader("Paid vs Outstanding")
-            
-            if ('Invoice_Date' in df_filtered.columns and 
-                'Invoice_Total_in_USD' in df_filtered.columns):
-                try:
-                    # Group by month
-                    monthly_paid = df_filtered.groupby('YearMonth')['Invoice_Total_in_USD'].sum().reset_index()
-                    monthly_paid.rename(columns={'Invoice_Total_in_USD': 'Total'}, inplace=True)
-                    
-                    # Calculate payments from multiple potential columns
-                    payment_found = False
-                    potential_payment_cols = [
-                        'Payments_Applied_Against_Invoice_in_USD',
-                        'Payments Received',
-                        'Payment Amount',
-                        'Payments Applied'
-                    ]
-                    
-                    for col in potential_payment_cols:
-                        if col in df_filtered.columns:
-                            payment_data = df_filtered.groupby('YearMonth')[col].sum().reset_index()
-                            # Check if payment values are positive or negative
-                            if payment_data[col].mean() < 0:
-                                # If payments are negative (accounting convention), take absolute value
-                                payment_data[col] = payment_data[col].abs()
-                            monthly_paid = pd.merge(monthly_paid, payment_data, on='YearMonth', how='left')
-                            monthly_paid.rename(columns={col: 'Paid'}, inplace=True)
-                            payment_found = True
-                            break
-                    
-                    # If no payment column found and balance due column exists
-                    if not payment_found and 'Invoice_Balance_Due_in_USD' in df_filtered.columns:
-                        balance_data = df_filtered.groupby('YearMonth')['Invoice_Balance_Due_in_USD'].sum().reset_index()
-                        monthly_paid = pd.merge(monthly_paid, balance_data, on='YearMonth', how='left')
-                        monthly_paid['Paid'] = monthly_paid['Total'] - monthly_paid['Invoice_Balance_Due_in_USD']
-                        monthly_paid['Outstanding'] = monthly_paid['Invoice_Balance_Due_in_USD']
-                        payment_found = True
-                    # If still no data, estimate
-                    elif not payment_found:
-                        monthly_paid['Paid'] = monthly_paid['Total'] * 0.85
-                        monthly_paid['Outstanding'] = monthly_paid['Total'] * 0.15
-                    else:
-                        monthly_paid['Outstanding'] = monthly_paid['Total'] - monthly_paid['Paid']
-                    
-                    monthly_paid = monthly_paid.sort_values('YearMonth')
-                    
-                    # Create stacked bar chart
-                    fig = go.Figure()
-                    
-                    fig.add_trace(go.Bar(
-                        x=monthly_paid['YearMonth'],
-                        y=monthly_paid['Paid'],
-                        name='Paid',
-                        marker_color='#10B981'
-                    ))
-                    
-                    fig.add_trace(go.Bar(
-                        x=monthly_paid['YearMonth'],
-                        y=monthly_paid['Outstanding'],
-                        name='Outstanding',
-                        marker_color='#EF4444'
-                    ))
-                    
-                    fig.update_layout(
-                        title='Paid vs Outstanding by Month',
-                        xaxis=dict(title='Month', tickangle=45),
-                        yaxis=dict(title='Amount (USD)'),
-                        barmode='stack',
-                        height=500
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.warning(f"Could not generate paid vs outstanding chart: {str(e)}")
-            else:
-                st.warning("Missing required columns for paid vs outstanding analysis")
-            
-            # Client contribution
-            st.subheader("Client Contribution")
-            
-            if 'Client' in df_filtered.columns and 'Invoice_Total_in_USD' in df_filtered.columns:
-                try:
-                    client_totals = df_filtered.groupby('Client')['Invoice_Total_in_USD'].sum().reset_index()
-                    client_totals = client_totals.sort_values('Invoice_Total_in_USD', ascending=False)
-                    
-                    # Get top 10 clients
-                    top_clients = client_totals.head(10)
-                    others_total = client_totals['Invoice_Total_in_USD'].sum() - top_clients['Invoice_Total_in_USD'].sum()
-                    
-                    if others_total > 0:
-                        others_df = pd.DataFrame({'Client': ['Others'], 'Invoice_Total_in_USD': [others_total]})
-                        pie_data = pd.concat([top_clients, others_df])
-                    else:
-                        pie_data = top_clients
-                    
-                    # Create pie chart
-                    fig = px.pie(
-                        pie_data,
-                        values='Invoice_Total_in_USD',
-                        names='Client',
-                        title='Top 10 Clients by Revenue',
-                        hole=0.4
-                    )
-                    
-                    fig.update_traces(textposition='inside', textinfo='percent+label')
-                    
-                    fig.update_layout(
-                        showlegend=True,
-                        height=500
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.warning(f"Could not generate client contribution chart: {str(e)}")
-            else:
-                st.warning("Missing required columns for client contribution")
-            
-            # Collections vs targets
-            st.subheader("Collections vs Targets")
-            
-            if 'Invoice_Date' in df_filtered.columns and 'Invoice_Total_in_USD' in df_filtered.columns:
-                try:
-                    # Group by month for invoice totals
-                    monthly_targets = df_filtered.groupby('YearMonth')['Invoice_Total_in_USD'].sum().reset_index()
-                    
-                    # Calculate payments using multiple approaches
-                    payment_found = False
-                    potential_payment_cols = [
-                        'Payments_Applied_Against_Invoice_in_USD',
-                        'Payments Received',
-                        'Payment Amount',
-                        'Payments Applied'
-                    ]
-                    
-                    for col in potential_payment_cols:
-                        if col in df_filtered.columns:
-                            payment_data = df_filtered.groupby('YearMonth')[col].sum().reset_index()
-                            # Check if payment values are positive or negative
-                            if payment_data[col].mean() < 0:
-                                # If payments are negative (accounting convention), take absolute value
-                                payment_data[col] = payment_data[col].abs()
-                            monthly_targets = pd.merge(monthly_targets, payment_data, on='YearMonth', how='left')
-                            monthly_targets.rename(columns={col: 'Payments'}, inplace=True)
-                            payment_found = True
-                            break
-                    
-                    # If no payment column found and balance due column exists
-                    if not payment_found and 'Invoice_Balance_Due_in_USD' in df_filtered.columns:
-                        balance_data = df_filtered.groupby('YearMonth')['Invoice_Balance_Due_in_USD'].sum().reset_index()
-                        monthly_targets = pd.merge(monthly_targets, balance_data, on='YearMonth', how='left')
-                        monthly_targets['Payments'] = monthly_targets['Invoice_Total_in_USD'] - monthly_targets['Invoice_Balance_Due_in_USD']
-                        payment_found = True
-                    # If still no data, estimate
-                    elif not payment_found:
-                        monthly_targets['Payments'] = monthly_targets['Invoice_Total_in_USD'] * 0.85
-                    
-                    # Create target as 90% of invoice total
-                    monthly_targets['Target'] = monthly_targets['Invoice_Total_in_USD'] * 0.9
-                    monthly_targets['Achievement'] = (monthly_targets['Payments'] / monthly_targets['Target'] * 100).clip(0, 100)
-                    monthly_targets = monthly_targets.sort_values('YearMonth')
-                    
-                    # Create color-coded bar chart
-                    colors = []
-                    for achievement in monthly_targets['Achievement']:
-                        if achievement >= 90:
-                            colors.append('#10B981')  # Green
-                        elif achievement >= 75:
-                            colors.append('#F59E0B')  # Yellow
-                        else:
-                            colors.append('#EF4444')  # Red
-                    
-                    fig = go.Figure()
-                    
-                    fig.add_trace(go.Bar(
-                        x=monthly_targets['YearMonth'],
-                        y=monthly_targets['Achievement'],
-                        marker_color=colors,
-                        name='Achievement Rate'
-                    ))
-                    
-                    # Add target line
-                    fig.add_shape(
-                        type='line',
-                        x0=0,
-                        y0=90,
-                        x1=1,
-                        y1=90,
-                        xref='paper',
-                        line=dict(
-                            color='green',
-                            width=2,
-                            dash='dash'
-                        )
-                    )
-                    
-                    fig.update_layout(
-                        title='Monthly Collection Achievement vs Target (90%)',
-                        xaxis=dict(title='Month', tickangle=45),
-                        yaxis=dict(title='Achievement Rate (%)', range=[0, 100]),
-                        height=500
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.warning(f"Could not generate collections vs targets: {str(e)}")
-            else:
-                st.warning("Missing required columns for collections vs targets analysis")
+            if not top_originators.empty:
+                top_3_originators = top_originators.head(3)
+                for i, row in enumerate(top_3_originators.itertuples(), 1):
+                    originator_metrics[f'top_{i}_originator'] = row.Originator
+                    originator_metrics[f'top_{i}_revenue'] = row.Invoice_Total_in_USD
+                    originator_metrics[f'top_{i}_percent'] = (row.Invoice_Total_in_USD / total_revenue * 100) if total_revenue > 0 else 0
         
-        # 3. Attorney Performance Tab
-        with tab3:
-            st.markdown("<h2 class='section-header'>👤 Attorney Performance</h2>", unsafe_allow_html=True)
+        # Cross-reference with personnel changes
+        if not personnel_changes.empty:
+            # Find originators who are also in the joiners/leavers list
+            recent_leavers = personnel_changes[personnel_changes['type'] == 'Leaver']['name'].tolist()
+            recent_joiners = personnel_changes[personnel_changes['type'] == 'Joiner']['name'].tolist()
             
-            # Top/Bottom Attorneys
-            st.subheader("Top/Bottom Attorneys")
+            # Check if top originators are among recent leavers (potential risk)
+            top_originator_risk = []
+            for i in range(1, 4):
+                originator_name = originator_metrics.get(f'top_{i}_originator', '')
+                if originator_name in recent_leavers:
+                    top_originator_risk.append(originator_name)
             
-            # Create metric selector
-            metric_options = {
-                'invoice_total': 'By Total Billed',
-                'collected': 'By Total Collected',
-                'delay': 'By Payment Delay'
-            }
+            if top_originator_risk:
+                st.warning(f"⚠️ {len(top_originator_risk)} of the top 3 originators have recently left: {', '.join(top_originator_risk)}")
+        
+        # Originator retention
+        if 'Invoice_Date' in df_filtered.columns:
+            # Calculate first and last appearance of each originator
+            originator_dates = df_filtered.groupby('Originator')['Invoice_Date'].agg(['min', 'max']).reset_index()
+            originator_dates.columns = ['Originator', 'First_Date', 'Last_Date']
             
-            selected_metric = st.selectbox(
-                "Select Performance Metric",
-                options=list(metric_options.keys()),
-                format_func=lambda x: metric_options[x]
+            # Calculate tenure in days
+            originator_dates['Tenure_Days'] = (originator_dates['Last_Date'] - originator_dates['First_Date']).dt.days
+            
+            # Count originators with tenure > 365 days (1 year)
+            long_term_originators = len(originator_dates[originator_dates['Tenure_Days'] > 365])
+            retention_rate = (long_term_originators / total_originators * 100) if total_originators > 0 else 0
+            originator_metrics['retention_rate'] = retention_rate
+            
+            # Calculate month-over-month growth
+            df_filtered['YearMonth'] = df_filtered['Invoice_Date'].dt.strftime('%Y-%m')
+            monthly_originators = df_filtered.groupby('YearMonth')['Originator'].nunique().reset_index()
+            monthly_originators.columns = ['YearMonth', 'Count']
+            monthly_originators = monthly_originators.sort_values('YearMonth')
+            
+            if len(monthly_originators) > 1:
+                current_month = monthly_originators.iloc[-1]['Count']
+                previous_month = monthly_originators.iloc[-2]['Count']
+                mom_growth = ((current_month - previous_month) / previous_month * 100) if previous_month > 0 else 0
+                originator_metrics['mom_growth'] = mom_growth
+except Exception as e:
+    st.warning(f"Error calculating origination metrics: {str(e)}")
+
+# Display origination metrics as cards
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown(f"""
+    <div class='kpi-card'>
+        <p class='kpi-title'>Total Originators</p>
+        <p class='kpi-value'>{originator_metrics.get('total_originators', 0)}</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown(f"""
+    <div class='kpi-card'>
+        <p class='kpi-title'>Avg Revenue per Originator</p>
+        <p class='kpi-value'>{format_currency(originator_metrics.get('avg_revenue_per_originator', 0))}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col2:
+    # Top performers
+    st.markdown(f"""
+    <div class='kpi-card'>
+        <p class='kpi-title'>Top Originator</p>
+        <p class='kpi-value'>{originator_metrics.get('top_1_originator', 'N/A')}</p>
+        <p>{format_currency(originator_metrics.get('top_1_revenue', 0))} ({originator_metrics.get('top_1_percent', 0):.1f}%)</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown(f"""
+    <div class='kpi-card'>
+        <p class='kpi-title'>#2 Originator</p>
+        <p class='kpi-value'>{originator_metrics.get('top_2_originator', 'N/A')}</p>
+        <p>{format_currency(originator_metrics.get('top_2_revenue', 0))} ({originator_metrics.get('top_2_percent', 0):.1f}%)</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col3:
+    # Retention and growth
+    retention_color = get_kpi_color(originator_metrics.get('retention_rate', 0), (50, 75))
+    st.markdown(f"""
+    <div class='kpi-card'>
+        <p class='kpi-title'>Originator Retention Rate</p>
+        <p class='kpi-value {retention_color}'>{originator_metrics.get('retention_rate', 0):.1f}%</p>
+        <p>% with 1+ year tenure</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # MoM growth
+    mom_value = originator_metrics.get('mom_growth', 0)
+    mom_color = "green-text" if mom_value > 0 else "red-text" if mom_value < 0 else ""
+    mom_sign = "+" if mom_value > 0 else ""
+    st.markdown(f"""
+    <div class='kpi-card'>
+        <p class='kpi-title'>Month-over-Month Growth</p>
+        <p class='kpi-value {mom_color}'>{mom_sign}{mom_value:.1f}%</p>
+        <p>In originator count</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# YoY Comparison
+st.markdown("<h3>Year-over-Year Comparison</h3>", unsafe_allow_html=True)
+
+# Calculate YoY metrics if date information is available
+if 'Invoice_Date' in df_filtered.columns and not df_filtered['Invoice_Date'].isna().all():
+    try:
+        # Group by year and calculate metrics
+        df_filtered['Year'] = df_filtered['Invoice_Date'].dt.year
+        
+        agg_dict = {'Invoice_Total_in_USD': 'sum'}
+        if payment_col:
+            agg_dict[payment_col] = 'sum'
+        if 'Invoice_Balance_Due_in_USD' in df_filtered.columns:
+            agg_dict['Invoice_Balance_Due_in_USD'] = 'sum'
+        
+        yearly_metrics = df_filtered.groupby('Year').agg(agg_dict).reset_index()
+        
+        # Calculate collection rate
+        if payment_col and payment_col in yearly_metrics.columns:
+            # Handle payment direction (positive or negative)
+            if yearly_metrics[payment_col].mean() < 0:
+                yearly_metrics['Payments'] = yearly_metrics[payment_col].abs()
+            else:
+                yearly_metrics['Payments'] = yearly_metrics[payment_col]
+                
+            yearly_metrics['Collection_Rate'] = yearly_metrics.apply(
+                lambda row: (row['Payments'] / row['Invoice_Total_in_USD'] * 100) if row['Invoice_Total_in_USD'] > 0 else 0, 
+                axis=1
+            )
+        
+            # Create bar chart
+            fig = go.Figure()
+            
+            # Add traces
+            fig.add_trace(go.Bar(
+                x=yearly_metrics['Year'],
+                y=yearly_metrics['Invoice_Total_in_USD'],
+                name='Total Invoiced',
+                marker_color='#3B82F6'
+            ))
+            
+            fig.add_trace(go.Bar(
+                x=yearly_metrics['Year'],
+                y=yearly_metrics['Payments'],
+                name='Total Collected',
+                marker_color='#10B981'
+            ))
+            
+            fig.add_trace(go.Scatter(
+                x=yearly_metrics['Year'],
+                y=yearly_metrics['Collection_Rate'],
+                name='Collection Rate (%)',
+                mode='lines+markers',
+                yaxis='y2',
+                line=dict(color='#EF4444', width=3),
+                marker=dict(size=10)
+            ))
+            
+            # Update layout
+            fig.update_layout(
+                title='Year-over-Year Financial Performance',
+                xaxis=dict(title='Year'),
+                yaxis=dict(title='Amount (USD)', side='left'),
+                yaxis2=dict(title='Collection Rate (%)', side='right', overlaying='y', range=[0, 100]),
+                legend=dict(orientation='h', yanchor='bottom', y=1.02),
+                barmode='group',
+                height=500
             )
             
-            try:
-                # Get performance data
-                attorney_perf = get_attorney_performance(df_filtered, metric=selected_metric, top_n=10)
-                
-                if not attorney_perf.empty:
-                    # Create horizontal bar chart
-                    fig = px.bar(
-                        attorney_perf,
-                        x='Value',
-                        y='Attorney',
-                        color='Rank',
-                        orientation='h',
-                        title=f'Attorney Performance {metric_options[selected_metric]}',
-                        labels={'Value': 'Value', 'Attorney': 'Attorney'},
-                        color_discrete_map={'Top': '#10B981', 'Bottom': '#EF4444'}
-                    )
-                    
-                    # Format axis labels based on metric
-                    if selected_metric == 'invoice_total' or selected_metric == 'collected':
-                        fig.update_layout(xaxis_title='Amount (USD)')
-                    elif selected_metric == 'delay':
-                        fig.update_layout(xaxis_title='Days')
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.warning(f"Not enough data to analyze attorney performance by {metric_options[selected_metric]}")
-            except Exception as e:
-                st.warning(f"Could not generate attorney performance chart: {str(e)}")
-            
-            # Joiners & Leavers Year-wise Trend
-            st.subheader("Joiners & Leavers: Year-wise Trend")
-            
-            if 'Originator' in df_filtered.columns and 'Invoice_Date' in df_filtered.columns:
-                try:
-                    # Group by year and count unique attorneys
-                    df_filtered['Year'] = df_filtered['Invoice_Date'].dt.year
-                    yearly_attorneys = df_filtered.groupby('Year')['Originator'].nunique().reset_index()
-                    yearly_attorneys.columns = ['Year', 'Attorney_Count']
-                    yearly_attorneys = yearly_attorneys.sort_values('Year')
-                    
-                    if len(yearly_attorneys) > 1:
-                        # Calculate year-over-year changes
-                        yearly_attorneys['Previous_Count'] = yearly_attorneys['Attorney_Count'].shift(1)
-                        yearly_attorneys['Net_Change'] = yearly_attorneys['Attorney_Count'] - yearly_attorneys['Previous_Count']
-                        yearly_attorneys['Joiners'] = yearly_attorneys['Net_Change'].apply(lambda x: max(0, x))
-                        yearly_attorneys['Leavers'] = yearly_attorneys['Net_Change'].apply(lambda x: abs(min(0, x)))
-                        
-                        # Drop NaN rows
-                        yearly_movement = yearly_attorneys.dropna()
-                        
-                        if not yearly_movement.empty:
-                            # Create visualization
-                            fig = go.Figure()
-                            
-                            fig.add_trace(go.Bar(
-                                x=yearly_movement['Year'],
-                                y=yearly_movement['Joiners'],
-                                name='Joiners',
-                                marker_color='#10B981'
-                            ))
-                            
-                            fig.add_trace(go.Bar(
-                                x=yearly_movement['Year'],
-                                y=yearly_movement['Leavers'],
-                                name='Leavers',
-                                marker_color='#EF4444'
-                            ))
-                            
-                            fig.add_trace(go.Scatter(
-                                x=yearly_movement['Year'],
-                                y=yearly_movement['Net_Change'],
-                                name='Net Change',
-                                mode='lines+markers',
-                                line=dict(color='#3B82F6', width=3),
-                                marker=dict(size=10)
-                            ))
-                            
-                            fig.update_layout(
-                                title='Yearly Joiners vs Leavers',
-                                xaxis=dict(title='Year'),
-                                yaxis=dict(title='Number of Attorneys'),
-                                barmode='group',
-                                legend=dict(orientation='h', yanchor='bottom', y=1.02),
-                                height=500
-                            )
-                            
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                            # Display summary table
-                            st.dataframe(yearly_movement[['Year', 'Attorney_Count', 'Joiners', 'Leavers', 'Net_Change']], use_container_width=True)
-                        else:
-                            st.warning("Insufficient year-over-year data")
-                    else:
-                        st.warning("Not enough years to analyze trends")
-                except Exception as e:
-                    st.warning(f"Could not analyze yearly trends: {str(e)}")
-            else:
-                st.warning("Missing required columns for yearly analysis")
-            
-            # Office/Team filter
-            if 'Accounting Entity' in df_filtered.columns:
-                st.subheader("Performance by Office/Team")
-                
-                try:
-                    # Get unique offices
-                    offices = ['All'] + safe_get_unique(df_filtered, 'Accounting Entity')
-                    selected_office = st.selectbox("Select Office/Team", options=offices, key="office_dropdown")
-                    
-                    if selected_office != 'All':
-                        # Filter by selected office
-                        office_df = df_filtered[df_filtered['Accounting Entity'] == selected_office]
-                        
-                        if not office_df.empty and 'Originator' in office_df.columns and 'Invoice_Total_in_USD' in office_df.columns:
-                            # Calculate performance by attorney
-                            office_attorneys = office_df.groupby('Originator')['Invoice_Total_in_USD'].sum().reset_index()
-                            office_attorneys.columns = ['Attorney', 'Total_Billed']
-                            office_attorneys = office_attorneys.sort_values('Total_Billed', ascending=False)
-                            
-                            # Display table
-                            st.dataframe(office_attorneys, use_container_width=True)
-                            
-                            # Create visualization
-                            if len(office_attorneys) > 0:
-                                fig = px.bar(
-                                    office_attorneys,
-                                    x='Attorney',
-                                    y='Total_Billed',
-                                    title=f'Attorney Performance in {selected_office}',
-                                    labels={'Total_Billed': 'Total Billed (USD)', 'Attorney': 'Attorney'},
-                                    color='Total_Billed',
-                                    color_continuous_scale='Blues'
-                                )
-                                
-                                fig.update_layout(
-                                    xaxis_tickangle=45,
-                                    height=500
-                                )
-                                
-                                st.plotly_chart(fig, use_container_width=True)
-                            else:
-                                st.warning(f"No billing data for {selected_office}")
-                        else:
-                            st.warning(f"No data available for {selected_office}")
-                except Exception as e:
-                    st.warning(f"Could not filter by office: {str(e)}")
-            else:
-                st.warning("Office/Team information not available")
-            
-            # Attorney Retention Analysis
-            st.subheader("Attorney Retention Analysis")
-            
-            if 'Originator' in df_filtered.columns and 'Invoice_Date' in df_filtered.columns:
-                try:
-                    # Calculate first and last appearance of each attorney
-                    first_appearance = df_filtered.groupby('Originator')['Invoice_Date'].min().reset_index()
-                    first_appearance.columns = ['Attorney', 'First_Invoice_Date']
-                    
-                    last_appearance = df_filtered.groupby('Originator')['Invoice_Date'].max().reset_index()
-                    last_appearance.columns = ['Attorney', 'Last_Invoice_Date']
-                    
-                    retention_data = pd.merge(first_appearance, last_appearance, on='Attorney')
-                    
-                    # Calculate tenure in months
-                    retention_data['Tenure_Days'] = (retention_data['Last_Invoice_Date'] - retention_data['First_Invoice_Date']).dt.days
-                    retention_data['Tenure_Months'] = retention_data['Tenure_Days'] / 30
-                    
-                    # Consider attorneys present in the most recent 3 months as "currently active"
-                    latest_date = df_filtered['Invoice_Date'].max()
-                    threshold_date = latest_date - pd.Timedelta(days=90)
-                    retention_data['Still_Active'] = retention_data['Last_Invoice_Date'] >= threshold_date
-                    
-                    # Display retention summary
-                    st.write("Attorney Retention Summary:")
-                    
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        total_attorneys = len(retention_data)
-                        active_attorneys = retention_data['Still_Active'].sum()
-                        retention_rate = (active_attorneys / total_attorneys * 100) if total_attorneys > 0 else 0
-                        
-                        st.metric("Total Attorneys", f"{total_attorneys}")
-                        st.metric("Currently Active", f"{active_attorneys}")
-                        st.metric("Retention Rate", f"{retention_rate:.1f}%")
-                    
-                    with col2:
-                        # Tenure distribution
-                        tenure_bins = [0, 3, 6, 12, 24, 36, float('inf')]
-                        tenure_labels = ['0-3 months', '3-6 months', '6-12 months', '1-2 years', '2-3 years', '3+ years']
-                        retention_data['Tenure_Group'] = pd.cut(retention_data['Tenure_Months'], bins=tenure_bins, labels=tenure_labels)
-                        
-                        tenure_dist = retention_data.groupby('Tenure_Group').size().reset_index()
-                        tenure_dist.columns = ['Tenure', 'Count']
-                        
-                        # Create tenure distribution chart
-                        fig = px.bar(
-                            tenure_dist,
-                            x='Tenure',
-                            y='Count',
-                            title='Attorney Tenure Distribution',
-                            color='Count',
-                            color_continuous_scale='Blues'
-                        )
-                        
-                        st.plotly_chart(fig, use_container_width=True)
-                    
-                    with col3:
-                        # Active vs inactive attorneys
-                        status_counts = retention_data['Still_Active'].value_counts().reset_index()
-                        status_counts.columns = ['Status', 'Count']
-                        status_counts['Status'] = status_counts['Status'].map({True: 'Active', False: 'Inactive'})
-                        
-                        fig = px.pie(
-                            status_counts,
-                            values='Count',
-                            names='Status',
-                            title='Attorney Status',
-                            color='Status',
-                            color_discrete_map={'Active': '#10B981', 'Inactive': '#EF4444'}
-                        )
-                        
-                        st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.warning(f"Could not analyze attorney retention: {str(e)}")
-            else:
-                st.warning("Missing required columns for retention analysis")
-        
-        # 4. Invoice Explorer Tab
-        with tab4:
-            st.markdown("<h2 class='section-header'>🧾 Invoice Explorer</h2>", unsafe_allow_html=True)
-            
-            # Create a searchable, filterable data table
-            st.subheader("Searchable Invoice Table")
-            
-            # Apply any additional filters specific to this tab
-            filtered_invoices = df_filtered.copy()
-            
-            # Search box
-            try:
-                search_term = st.text_input("Search (Client, Matter, Invoice Number)", key="invoice_search")
-                
-                if search_term:
-                    # Create search mask
-                    search_mask = pd.Series(False, index=filtered_invoices.index)
-                    
-                    # Search in relevant columns
-                    search_columns = ['Client', 'Matter', 'Invoice_Number']
-                    for col in search_columns:
-                        if col in filtered_invoices.columns:
-                            search_mask |= filtered_invoices[col].astype(str).str.contains(search_term, case=False, na=False)
-                    
-                    filtered_invoices = filtered_invoices[search_mask]
-            except:
-                st.warning("Search functionality unavailable")
-            
-            # Display data table
-            try:
-                # Select columns to display
-                display_columns = [
-                    'Invoice_Number', 'Invoice_Date', 'Client', 'Matter', 'Originator',
-                    'Invoice_Total_in_USD', payment_col, 'Invoice_Balance_Due_in_USD',
-                    'Last payment date', 'Days between Invoice date and last payment date'
-                ] if payment_col else [
-                    'Invoice_Number', 'Invoice_Date', 'Client', 'Matter', 'Originator',
-                    'Invoice_Total_in_USD', 'Invoice_Balance_Due_in_USD',
-                    'Last payment date', 'Days between Invoice date and last payment date'
-                ]
-                
-                # Only include columns that exist
-                display_columns = [col for col in display_columns if col in filtered_invoices.columns]
-                
-                if not display_columns:
-                    display_columns = filtered_invoices.columns.tolist()[:10]  # Show first 10 columns if none match
-                
-                # Show dataframe
-                st.dataframe(
-                    filtered_invoices[display_columns],
-                    use_container_width=True,
-                    hide_index=True
-                )
-                
-                # Display record count
-                st.write(f"Showing {len(filtered_invoices)} of {len(df_filtered)} invoices")
-                
-                # Download options
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.markdown(download_csv(filtered_invoices[display_columns]), unsafe_allow_html=True)
-                
-                with col2:
-                    st.markdown(download_excel(filtered_invoices[display_columns]), unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"Error displaying invoice table: {str(e)}")
-        
-        # 5. Payment Behavior Tab
-        with tab5:
-            st.markdown("<h2 class='section-header'>⏱️ Payment Behavior</h2>", unsafe_allow_html=True)
-            
-            # Average Payment Delay
-            st.subheader("Average Payment Delay")
-            
-            if ('Client' in df_filtered.columns and 
-                'Days between Invoice date and last payment date' in df_filtered.columns):
-                try:
-                    # Filter rows with valid payment delay data
-                    delay_df = df_filtered[df_filtered['Days between Invoice date and last payment date'] != 'Unpaid'].copy()
-                    
-                    if not delay_df.empty:
-                        # Convert to numeric
-                        delay_df['Delay_Days'] = pd.to_numeric(delay_df['Days between Invoice date and last payment date'], errors='coerce')
-                        
-                        # Calculate average by client
-                        client_delay = delay_df.groupby('Client')['Delay_Days'].mean().reset_index()
-                        client_delay.columns = ['Client', 'Avg_Delay_Days']
-                        client_delay = client_delay.sort_values('Avg_Delay_Days', ascending=False)
-                        
-                        # Get top 10
-                        top_delay = client_delay.head(10)
-                        
-                        if not top_delay.empty:
-                            # Create bar chart
-                            fig = px.bar(
-                                top_delay,
-                                x='Client',
-                                y='Avg_Delay_Days',
-                                title='Top 10 Clients by Average Payment Delay',
-                                labels={'Avg_Delay_Days': 'Average Delay (Days)', 'Client': 'Client'},
-                                color='Avg_Delay_Days',
-                                color_continuous_scale='Reds'
-                            )
-                            
-                            fig.update_layout(
-                                xaxis_tickangle=45,
-                                height=500
-                            )
-                            
-                            st.plotly_chart(fig, use_container_width=True)
-                        else:
-                            st.warning("No delay data to display")
-                    else:
-                        st.warning("No payment delay data available")
-                except Exception as e:
-                    st.warning(f"Could not analyze payment delays: {str(e)}")
-            else:
-                st.warning("Missing required columns for payment delay analysis")
-            
-            # Aged Receivables
-            st.subheader("Aged Receivables")
-            
-            if ('Invoice_Date' in df_filtered.columns and 
-                'Invoice_Balance_Due_in_USD' in df_filtered.columns):
-                try:
-                    # Calculate age of receivables
-                    receivables_df = df_filtered[df_filtered['Invoice_Balance_Due_in_USD'] > 0].copy()
-                    
-                    if not receivables_df.empty:
-                        # Calculate days outstanding
-                        receivables_df['Days_Outstanding'] = (pd.Timestamp.now() - receivables_df['Invoice_Date']).dt.days
-                        
-                        # Create age buckets
-                        bins = [0, 30, 60, 90, 120, float('inf')]
-                        labels = ['0-30 days', '31-60 days', '61-90 days', '91-120 days', '120+ days']
-                        receivables_df['Age_Bucket'] = pd.cut(receivables_df['Days_Outstanding'], bins=bins, labels=labels)
-                        
-                        # Sum by age bucket
-                        aged_receivables = receivables_df.groupby('Age_Bucket')['Invoice_Balance_Due_in_USD'].sum().reset_index()
-                        
-                        if not aged_receivables.empty:
-                            # Create bar chart
-                            fig = px.bar(
-                                aged_receivables,
-                                x='Age_Bucket',
-                                y='Invoice_Balance_Due_in_USD',
-                                title='Aged Receivables',
-                                labels={'Invoice_Balance_Due_in_USD': 'Amount (USD)', 'Age_Bucket': 'Age'},
-                                color='Age_Bucket',
-                                color_discrete_sequence=['#10B981', '#3B82F6', '#F59E0B', '#FB7185', '#EF4444']
-                            )
-                            
-                            fig.update_layout(
-                                height=500
-                            )
-                            
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                            # Show table
-                            st.dataframe(aged_receivables, use_container_width=True)
-                        else:
-                            st.warning("No aged receivables data to display")
-                    else:
-                        st.warning("No outstanding receivables found")
-                except Exception as e:
-                    st.warning(f"Could not analyze aged receivables: {str(e)}")
-            else:
-                st.warning("Missing required columns for aged receivables analysis")
-            
-            # Invoice Size vs. Payment Speed
-            st.subheader("Invoice Size vs. Payment Speed")
-            
-            if ('Invoice_Total_in_USD' in df_filtered.columns and 
-                'Days between Invoice date and last payment date' in df_filtered.columns):
-                try:
-                    # Filter to rows with payment data
-                    scatter_df = df_filtered[df_filtered['Days between Invoice date and last payment date'] != 'Unpaid'].copy()
-                    
-                    if not scatter_df.empty:
-                        # Convert to numeric
-                        scatter_df['Payment_Days'] = pd.to_numeric(scatter_df['Days between Invoice date and last payment date'], errors='coerce')
-                        
-                        # Create scatter plot
-                        fig = px.scatter(
-                            scatter_df,
-                            x='Invoice_Total_in_USD',
-                            y='Payment_Days',
-                            color='Client' if 'Client' in scatter_df.columns else None,
-                            size='Invoice_Total_in_USD',
-                            hover_name='Client' if 'Client' in scatter_df.columns else None,
-                            title='Invoice Size vs. Payment Speed',
-                            labels={
-                                'Invoice_Total_in_USD': 'Invoice Amount (USD)',
-                                'Payment_Days': 'Days to Payment'
-                            }
-                        )
-                        
-                        fig.update_layout(
-                            height=600
-                        )
-                        
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Analysis
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            # Calculate correlation
-                            correlation = scatter_df['Invoice_Total_in_USD'].corr(scatter_df['Payment_Days'])
-                            
-                            interpretation = "No correlation"
-                            if correlation > 0.5:
-                                interpretation = "Strong positive correlation (larger invoices take longer to pay)"
-                            elif correlation > 0.3:
-                                interpretation = "Moderate positive correlation"
-                            elif correlation > 0:
-                                interpretation = "Weak positive correlation"
-                            elif correlation < 0:
-                                interpretation = "Negative correlation (larger invoices are paid faster)"
-                            
-                            st.markdown(f"""
-                            <div style="padding: 1rem; background-color: #f8f9fa; border-radius: 10px;">
-                                <h4>Analysis</h4>
-                                <p><strong>Correlation:</strong> {correlation:.2f}</p>
-                                <p><strong>Interpretation:</strong> {interpretation}</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        
-                        with col2:
-                            # Group by size range
-                            try:
-                                scatter_df['Size_Range'] = pd.cut(
-                                    scatter_df['Invoice_Total_in_USD'],
-                                    bins=[0, 1000, 5000, 10000, float('inf')],
-                                    labels=['< $1K', '$1K-$5K', '$5K-$10K', '> $10K']
-                                )
-                                
-                                size_vs_delay = scatter_df.groupby('Size_Range')['Payment_Days'].mean().reset_index()
-                                
-                                st.dataframe(size_vs_delay, use_container_width=True)
-                            except:
-                                st.warning("Could not analyze by invoice size range")
-                    else:
-                        st.warning("No payment speed data available")
-                except Exception as e:
-                    st.warning(f"Could not analyze invoice size vs payment speed: {str(e)}")
-            else:
-                st.warning("Missing required columns for payment speed analysis")
-    
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning("Missing required data for YoY comparison")
     except Exception as e:
-        st.error(f"An error occurred in the dashboard: {str(e)}")
-        st.error(traceback.format_exc())
+        st.warning(f"Could not generate Year-over-Year comparison: {str(e)}")
+else:
+    st.warning("Date information is not available for year-over-year comparison.")
+
+# Joiners vs Leavers Analysis (Based on Invoice Data)
+st.markdown("<h3>Joiners vs Leavers Analysis (Based on Invoice Data)</h3>", unsafe_allow_html=True)
+
+# Note about the additional data source
+st.info("This section shows joiners/leavers based on Invoice data patterns. For official personnel changes, see the Personnel Changes tab.")
+
+if 'Originator' in df_filtered.columns and 'Invoice_Date' in df_filtered.columns:
+    try:
+        # Add year and month columns
+        df_filtered['Year'] = df_filtered['Invoice_Date'].dt.year
+        df_filtered['Month'] = df_filtered['Invoice_Date'].dt.month
+        df_filtered['YearMonth'] = df_filtered['Invoice_Date'].dt.strftime('%Y-%m')
+        
+        # Get monthly attorney counts
+        monthly_attorneys = df_filtered.groupby('YearMonth')['Originator'].nunique().reset_index()
+        monthly_attorneys.columns = ['YearMonth', 'Attorney_Count']
+        monthly_attorneys = monthly_attorneys.sort_values('YearMonth')
+        
+        if len(monthly_attorneys) > 1:
+            # Calculate joiners and leavers
+            monthly_attorneys['Previous_Count'] = monthly_attorneys['Attorney_Count'].shift(1)
+            monthly_attorneys['Net_Change'] = monthly_attorneys['Attorney_Count'] - monthly_attorneys['Previous_Count']
+            
+            # Split into joiners and leavers for visualization
+            monthly_attorneys['Joiners'] = monthly_attorneys['Net_Change'].apply(lambda x: max(0, x))
+            monthly_attorneys['Leavers'] = monthly_attorneys['Net_Change'].apply(lambda x: abs(min(0, x)))
+            
+            # Create visualization
+            fig = go.Figure()
+            
+            fig.add_trace(go.Bar(
+                x=monthly_attorneys['YearMonth'],
+                y=monthly_attorneys['Joiners'],
+                name='Joiners',
+                marker_color='#10B981'
+            ))
+            
+            fig.add_trace(go.Bar(
+                x=monthly_attorneys['YearMonth'],
+                y=monthly_attorneys['Leavers'],
+                name='Leavers',
+                marker_color='#EF4444'
+            ))
+            
+            fig.add_trace(go.Scatter(
+                x=monthly_attorneys['YearMonth'],
+                y=monthly_attorneys['Net_Change'],
+                name='Net Change',
+                mode='lines+markers',
+                line=dict(color='#3B82F6', width=3),
+                marker=dict(size=8)
+            ))
+            
+            fig.update_layout(
+                title='Monthly Joiners vs Leavers (Invoice Activity)',
+                xaxis=dict(title='Month', tickangle=45),
+                yaxis=dict(title='Number of Attorneys'),
+                barmode='group',
+                legend=dict(orientation='h', yanchor='bottom', y=1.02),
+                height=500
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Calculate yearly summary
+            yearly_attorneys = df_filtered.groupby('Year')['Originator'].nunique().reset_index()
+            yearly_attorneys.columns = ['Year', 'Attorney_Count']
+            yearly_attorneys = yearly_attorneys.sort_values('Year')
+            
+            if len(yearly_attorneys) > 1:
+                yearly_attorneys['Previous_Count'] = yearly_attorneys['Attorney_Count'].shift(1)
+                yearly_attorneys['Net_Change'] = yearly_attorneys['Attorney_Count'] - yearly_attorneys['Previous_Count']
+                yearly_attorneys['Joiners'] = yearly_attorneys['Net_Change'].apply(lambda x: max(0, x))
+                yearly_attorneys['Leavers'] = yearly_attorneys['Net_Change'].apply(lambda x: abs(min(0, x)))
+                
+                # Drop NaN rows
+                yearly_attorneys = yearly_attorneys.dropna()
+                
+                if not yearly_attorneys.empty:
+                    st.subheader("Year-wise Trend")
+                    st.dataframe(yearly_attorneys[['Year', 'Attorney_Count', 'Joiners', 'Leavers', 'Net_Change']], use_container_width=True)
+                    
+                    # Compare with official personnel data if available
+                    if not personnel_changes.empty:
+                        st.info("Note: This analysis is based on invoice patterns and may differ from official personnel records in the Personnel Changes tab.")
+        else:
+            st.warning("Not enough time periods to analyze joiners and leavers")
+    except Exception as e:
+        st.warning(f"Could not analyze joiners and leavers: {str(e)}")
+else:
+    st.warning("Missing required columns for joiners/leavers analysis")
+
+# Top & Bottom Performers
+st.markdown("<h3>Top & Bottom Performers</h3>", unsafe_allow_html=True)
+
+try:
+    # Get performance data
+    top_billed = get_attorney_performance(df_filtered, metric='invoice_total', top_n=5)
+    
+    if not top_billed.empty:
+        # Create visualization
+        fig = px.bar(
+            top_billed,
+            x='Value',
+            y='Attorney',
+            color='Rank',
+            orientation='h',
+            title='Top & Bottom Attorneys by Billing',
+            labels={'Value': 'Total Billed (USD)', 'Attorney': ''},
+            color_discrete_map={'Top': '#10B981', 'Bottom': '#EF4444'}
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("Not enough billing data for top performer analysis")
+        
+except Exception as e:
+    st.warning(f"Could not generate top performers chart: {str(e)}")
+
+# 2. Trends Dashboard Tab
+with tab2:
+    st.markdown("<h2 class='section-header'>📈 Trends Dashboard</h2>", unsafe_allow_html=True)
+    
+    # Revenue over time
+    st.subheader("Revenue Over Time")
+    
+    if 'Invoice_Date' in df_filtered.columns and 'Invoice_Total_in_USD' in df_filtered.columns:
+        try:
+            # Group by month
+            df_filtered['YearMonth'] = df_filtered['Invoice_Date'].dt.strftime('%Y-%m')
+            monthly_revenue = df_filtered.groupby('YearMonth')['Invoice_Total_in_USD'].sum().reset_index()
+            monthly_revenue = monthly_revenue.sort_values('YearMonth')
+            
+            # Create line chart
+            fig = px.line(
+                monthly_revenue, 
+                x='YearMonth', 
+                y='Invoice_Total_in_USD',
+                markers=True,
+                labels={'Invoice_Total_in_USD': 'Amount (USD)', 'YearMonth': 'Month'},
+                title='Monthly Revenue'
+            )
+            
+            fig.update_layout(
+                xaxis_tickangle=45,
+                height=500
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+        except Exception as e:
+            st.warning(f"Could not generate revenue trend: {str(e)}")
+    else:
+        st.warning("Missing required columns for revenue trend")
+    
+    # Paid vs Outstanding
+    st.subheader("Paid vs Outstanding")
+    
+    if ('Invoice_Date' in df_filtered.columns and 
+        'Invoice_Total_in_USD' in df_filtered.columns):
+        try:
+            # Group by month
+            monthly_paid = df_filtered.groupby('YearMonth')['Invoice_Total_in_USD'].sum().reset_index()
+            monthly_paid.rename(columns={'Invoice_Total_in_USD': 'Total'}, inplace=True)
+            
+            # Calculate payments from multiple potential columns
+            payment_found = False
+            potential_payment_cols = [
+                'Payments_Applied_Against_Invoice_in_USD',
+                'Payments Received',
+                'Payment Amount',
+                'Payments Applied'
+            ]
+            
+            for col in potential_payment_cols:
+                if col in df_filtered.columns:
+                    payment_data = df_filtered.groupby('YearMonth')[col].sum().reset_index()
+                    # Check if payment values are positive or negative
+                    if payment_data[col].mean() < 0:
+                        # If payments are negative (accounting convention), take absolute value
+                        payment_data[col] = payment_data[col].abs()
+                    monthly_paid = pd.merge(monthly_paid, payment_data, on='YearMonth', how='left')
+                    monthly_paid.rename(columns={col: 'Paid'}, inplace=True)
+                    payment_found = True
+                    break
+            
+            # If no payment column found and balance due column exists
+            if not payment_found and 'Invoice_Balance_Due_in_USD' in df_filtered.columns:
+                balance_data = df_filtered.groupby('YearMonth')['Invoice_Balance_Due_in_USD'].sum().reset_index()
+                monthly_paid = pd.merge(monthly_paid, balance_data, on='YearMonth', how='left')
+                monthly_paid['Paid'] = monthly_paid['Total'] - monthly_paid['Invoice_Balance_Due_in_USD']
+                monthly_paid['Outstanding'] = monthly_paid['Invoice_Balance_Due_in_USD']
+                payment_found = True
+            # If still no data, estimate
+            elif not payment_found:
+                monthly_paid['Paid'] = monthly_paid['Total'] * 0.85
+                monthly_paid['Outstanding'] = monthly_paid['Total'] * 0.15
+            else:
+                monthly_paid['Outstanding'] = monthly_paid['Total'] - monthly_paid['Paid']
+            
+            monthly_paid = monthly_paid.sort_values('YearMonth')
+            
+            # Create stacked bar chart
+            fig = go.Figure()
+            
+            fig.add_trace(go.Bar(
+                x=monthly_paid['YearMonth'],
+                y=monthly_paid['Paid'],
+                name='Paid',
+                marker_color='#10B981'
+            ))
+            
+            fig.add_trace(go.Bar(
+                x=monthly_paid['YearMonth'],
+                y=monthly_paid['Outstanding'],
+                name='Outstanding',
+                marker_color='#EF4444'
+            ))
+            
+            fig.update_layout(
+                title='Paid vs Outstanding by Month',
+                xaxis=dict(title='Month', tickangle=45),
+                yaxis=dict(title='Amount (USD)'),
+                barmode='stack',
+                height=500
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+        except Exception as e:
+            st.warning(f"Could not generate paid vs outstanding chart: {str(e)}")
+    else:
+        st.warning("Missing required columns for paid vs outstanding analysis")
+    
+    # Client contribution
+    st.subheader("Client Contribution")
+    
+    if 'Client' in df_filtered.columns and 'Invoice_Total_in_USD' in df_filtered.columns:
+        try:
+            client_totals = df_filtered.groupby('Client')['Invoice_Total_in_USD'].sum().reset_index()
+            client_totals = client_totals.sort_values('Invoice_Total_in_USD', ascending=False)
+            
+            # Get top 10 clients
+            top_clients = client_totals.head(10)
+            others_total = client_totals['Invoice_Total_in_USD'].sum() - top_clients['Invoice_Total_in_USD'].sum()
+            
+            if others_total > 0:
+                others_df = pd.DataFrame({'Client': ['Others'], 'Invoice_Total_in_USD': [others_total]})
+                pie_data = pd.concat([top_clients, others_df])
+            else:
+                pie_data = top_clients
+            
+            # Create pie chart
+            fig = px.pie(
+                pie_data,
+                values='Invoice_Total_in_USD',
+                names='Client',
+                title='Top 10 Clients by Revenue',
+                hole=0.4
+            )
+            
+            fig.update_traces(textposition='inside', textinfo='percent+label')
+            
+            fig.update_layout(
+                showlegend=True,
+                height=500
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+        except Exception as e:
+            st.warning(f"Could not generate client contribution chart: {str(e)}")
+    else:
+        st.warning("Missing required columns for client contribution")
+    
+    # Collections vs targets
+    st.subheader("Collections vs Targets")
+    
+    if 'Invoice_Date' in df_filtered.columns and 'Invoice_Total_in_USD' in df_filtered.columns:
+        try:
+            # Group by month for invoice totals
+            monthly_targets = df_filtered.groupby('YearMonth')['Invoice_Total_in_USD'].sum().reset_index()
+            
+            # Calculate payments using multiple approaches
+            payment_found = False
+            potential_payment_cols = [
+                'Payments_Applied_Against_Invoice_in_USD',
+                'Payments Received',
+                'Payment Amount',
+                'Payments Applied'
+            ]
+            
+            for col in potential_payment_cols:
+                if col in df_filtered.columns:
+                    payment_data = df_filtered.groupby('YearMonth')[col].sum().reset_index()
+                    # Check if payment values are positive or negative
+                    if payment_data[col].mean() < 0:
+                        # If payments are negative (accounting convention), take absolute value
+                        payment_data[col] = payment_data[col].abs()
+                    monthly_targets = pd.merge(monthly_targets, payment_data, on='YearMonth', how='left')
+                    monthly_targets.rename(columns={col: 'Payments'}, inplace=True)
+                    payment_found = True
+                    break
+            
+            # If no payment column found and balance due column exists
+            if not payment_found and 'Invoice_Balance_Due_in_USD' in df_filtered.columns:
+                balance_data = df_filtered.groupby('YearMonth')['Invoice_Balance_Due_in_USD'].sum().reset_index()
+                monthly_targets = pd.merge(monthly_targets, balance_data, on='YearMonth', how='left')
+                monthly_targets['Payments'] = monthly_targets['Invoice_Total_in_USD'] - monthly_targets['Invoice_Balance_Due_in_USD']
+                payment_found = True
+            # If still no data, estimate
+            elif not payment_found:
+                monthly_targets['Payments'] = monthly_targets['Invoice_Total_in_USD'] * 0.85
+            
+            # Create target as 90% of invoice total
+            monthly_targets['Target'] = monthly_targets['Invoice_Total_in_USD'] * 0.9
+            monthly_targets['Achievement'] = (monthly_targets['Payments'] / monthly_targets['Target'] * 100).clip(0, 100)
+            monthly_targets = monthly_targets.sort_values('YearMonth')
+            
+            # Create color-coded bar chart
+            colors = []
+            for achievement in monthly_targets['Achievement']:
+                if achievement >= 90:
+                    colors.append('#10B981')  # Green
+                elif achievement >= 75:
+                    colors.append('#F59E0B')  # Yellow
+                else:
+                    colors.append('#EF4444')  # Red
+            
+            fig = go.Figure()
+            
+            fig.add_trace(go.Bar(
+                x=monthly_targets['YearMonth'],
+                y=monthly_targets['Achievement'],
+                marker_color=colors,
+                name='Achievement Rate'
+            ))
+            
+            # Add target line
+            fig.add_shape(
+                type='line',
+                x0=0,
+                y0=90,
+                x1=1,
+                y1=90,
+                xref='paper',
+                line=dict(
+                    color='green',
+                    width=2,
+                    dash='dash'
+                )
+            )
+            
+            fig.update_layout(
+                title='Monthly Collection Achievement vs Target (90%)',
+                xaxis=dict(title='Month', tickangle=45),
+                yaxis=dict(title='Achievement Rate (%)', range=[0, 100]),
+                height=500
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+        except Exception as e:
+            st.warning(f"Could not generate collections vs targets: {str(e)}")
+    else:
+        st.warning("Missing required columns for collections vs targets analysis")
+
+# 3. Attorney Performance Tab
+with tab3:
+   st.markdown("<h2 class='section-header'>👤 Attorney Performance</h2>", unsafe_allow_html=True)
+   
+   # Top/Bottom Attorneys
+   st.subheader("Top/Bottom Attorneys")
+   
+   # Create metric selector
+   metric_options = {
+       'invoice_total': 'By Total Billed',
+       'collected': 'By Total Collected',
+       'delay': 'By Payment Delay'
+   }
+   
+   selected_metric = st.selectbox(
+       "Select Performance Metric",
+       options=list(metric_options.keys()),
+       format_func=lambda x: metric_options[x]
+   )
+   
+   try:
+       # Get performance data
+       attorney_perf = get_attorney_performance(df_filtered, metric=selected_metric, top_n=10)
+       
+       if not attorney_perf.empty:
+           # Create horizontal bar chart
+           fig = px.bar(
+               attorney_perf,
+               x='Value',
+               y='Attorney',
+               color='Rank',
+               orientation='h',
+               title=f'Attorney Performance {metric_options[selected_metric]}',
+               labels={'Value': 'Value', 'Attorney': 'Attorney'},
+               color_discrete_map={'Top': '#10B981', 'Bottom': '#EF4444'}
+           )
+           
+           # Format axis labels based on metric
+           if selected_metric == 'invoice_total' or selected_metric == 'collected':
+               fig.update_layout(xaxis_title='Amount (USD)')
+           elif selected_metric == 'delay':
+               fig.update_layout(xaxis_title='Days')
+           
+           st.plotly_chart(fig, use_container_width=True)
+       else:
+           st.warning(f"Not enough data to analyze attorney performance by {metric_options[selected_metric]}")
+   except Exception as e:
+       st.warning(f"Could not generate attorney performance chart: {str(e)}")
+   
+   # Joiners & Leavers Year-wise Trend
+   st.subheader("Joiners & Leavers: Year-wise Trend")
+   
+   if 'Originator' in df_filtered.columns and 'Invoice_Date' in df_filtered.columns:
+       try:
+           # Group by year and count unique attorneys
+           df_filtered['Year'] = df_filtered['Invoice_Date'].dt.year
+           yearly_attorneys = df_filtered.groupby('Year')['Originator'].nunique().reset_index()
+           yearly_attorneys.columns = ['Year', 'Attorney_Count']
+           yearly_attorneys = yearly_attorneys.sort_values('Year')
+           
+           if len(yearly_attorneys) > 1:
+               # Calculate year-over-year changes
+               yearly_attorneys['Previous_Count'] = yearly_attorneys['Attorney_Count'].shift(1)
+               yearly_attorneys['Net_Change'] = yearly_attorneys['Attorney_Count'] - yearly_attorneys['Previous_Count']
+               yearly_attorneys['Joiners'] = yearly_attorneys['Net_Change'].apply(lambda x: max(0, x))
+               yearly_attorneys['Leavers'] = yearly_attorneys['Net_Change'].apply(lambda x: abs(min(0, x)))
+               
+               # Drop NaN rows
+               yearly_movement = yearly_attorneys.dropna()
+               
+               if not yearly_movement.empty:
+                   # Create visualization
+                   fig = go.Figure()
+                   
+                   fig.add_trace(go.Bar(
+                       x=yearly_movement['Year'],
+                       y=yearly_movement['Joiners'],
+                       name='Joiners',
+                       marker_color='#10B981'
+                   ))
+                   
+                   fig.add_trace(go.Bar(
+                       x=yearly_movement['Year'],
+                       y=yearly_movement['Leavers'],
+                       name='Leavers',
+                       marker_color='#EF4444'
+                   ))
+                   
+                   fig.add_trace(go.Scatter(
+                       x=yearly_movement['Year'],
+                       y=yearly_movement['Net_Change'],
+                       name='Net Change',
+                       mode='lines+markers',
+                       line=dict(color='#3B82F6', width=3),
+                       marker=dict(size=10)
+                   ))
+                   
+                   fig.update_layout(
+                       title='Yearly Joiners vs Leavers',
+                       xaxis=dict(title='Year'),
+                       yaxis=dict(title='Number of Attorneys'),
+                       barmode='group',
+                       legend=dict(orientation='h', yanchor='bottom', y=1.02),
+                       height=500
+                   )
+                   
+                   st.plotly_chart(fig, use_container_width=True)
+                   
+                   # Display summary table
+                   st.dataframe(yearly_movement[['Year', 'Attorney_Count', 'Joiners', 'Leavers', 'Net_Change']], use_container_width=True)
+               else:
+                   st.warning("Insufficient year-over-year data")
+           else:
+               st.warning("Not enough years to analyze trends")
+       except Exception as e:
+           st.warning(f"Could not analyze yearly trends: {str(e)}")
+   else:
+       st.warning("Missing required columns for yearly analysis")
+   
+   # Office/Team filter
+   if 'Accounting Entity' in df_filtered.columns:
+       st.subheader("Performance by Office/Team")
+       
+       try:
+           # Get unique offices
+           offices = ['All'] + safe_get_unique(df_filtered, 'Accounting Entity')
+           selected_office = st.selectbox("Select Office/Team", options=offices, key="office_dropdown")
+           
+           if selected_office != 'All':
+               # Filter by selected office
+               office_df = df_filtered[df_filtered['Accounting Entity'] == selected_office]
+               
+               if not office_df.empty and 'Originator' in office_df.columns and 'Invoice_Total_in_USD' in office_df.columns:
+                   # Calculate performance by attorney
+                   office_attorneys = office_df.groupby('Originator')['Invoice_Total_in_USD'].sum().reset_index()
+                   office_attorneys.columns = ['Attorney', 'Total_Billed']
+                   office_attorneys = office_attorneys.sort_values('Total_Billed', ascending=False)
+                   
+                   # Display table
+                   st.dataframe(office_attorneys, use_container_width=True)
+                   
+                   # Create visualization
+                   if len(office_attorneys) > 0:
+                       fig = px.bar(
+                           office_attorneys,
+                           x='Attorney',
+                           y='Total_Billed',
+                           title=f'Attorney Performance in {selected_office}',
+                           labels={'Total_Billed': 'Total Billed (USD)', 'Attorney': 'Attorney'},
+                           color='Total_Billed',
+                           color_continuous_scale='Blues'
+                       )
+                       
+                       fig.update_layout(
+                           xaxis_tickangle=45,
+                           height=500
+                       )
+                       
+                       st.plotly_chart(fig, use_container_width=True)
+                   else:
+                       st.warning(f"No billing data for {selected_office}")
+               else:
+                   st.warning(f"No data available for {selected_office}")
+       except Exception as e:
+           st.warning(f"Could not filter by office: {str(e)}")
+   else:
+       st.warning("Office/Team information not available")
+   
+   # Attorney Retention Analysis
+   st.subheader("Attorney Retention Analysis")
+   
+   if 'Originator' in df_filtered.columns and 'Invoice_Date' in df_filtered.columns:
+       try:
+           # Calculate first and last appearance of each attorney
+           first_appearance = df_filtered.groupby('Originator')['Invoice_Date'].min().reset_index()
+           first_appearance.columns = ['Attorney', 'First_Invoice_Date']
+           
+           last_appearance = df_filtered.groupby('Originator')['Invoice_Date'].max().reset_index()
+           last_appearance.columns = ['Attorney', 'Last_Invoice_Date']
+           
+           retention_data = pd.merge(first_appearance, last_appearance, on='Attorney')
+           
+           # Calculate tenure in months
+           retention_data['Tenure_Days'] = (retention_data['Last_Invoice_Date'] - retention_data['First_Invoice_Date']).dt.days
+           retention_data['Tenure_Months'] = retention_data['Tenure_Days'] / 30
+           
+           # Consider attorneys present in the most recent 3 months as "currently active"
+           latest_date = df_filtered['Invoice_Date'].max()
+           threshold_date = latest_date - pd.Timedelta(days=90)
+           retention_data['Still_Active'] = retention_data['Last_Invoice_Date'] >= threshold_date
+           
+           # Display retention summary
+           st.write("Attorney Retention Summary:")
+           
+           col1, col2, col3 = st.columns(3)
+           with col1:
+               total_attorneys = len(retention_data)
+               active_attorneys = retention_data['Still_Active'].sum()
+               retention_rate = (active_attorneys / total_attorneys * 100) if total_attorneys > 0 else 0
+               
+               st.metric("Total Attorneys", f"{total_attorneys}")
+               st.metric("Currently Active", f"{active_attorneys}")
+               st.metric("Retention Rate", f"{retention_rate:.1f}%")
+           
+           with col2:
+               # Tenure distribution
+               tenure_bins = [0, 3, 6, 12, 24, 36, float('inf')]
+               tenure_labels = ['0-3 months', '3-6 months', '6-12 months', '1-2 years', '2-3 years', '3+ years']
+               retention_data['Tenure_Group'] = pd.cut(retention_data['Tenure_Months'], bins=tenure_bins, labels=tenure_labels)
+               
+               tenure_dist = retention_data.groupby('Tenure_Group').size().reset_index()
+               tenure_dist.columns = ['Tenure', 'Count']
+               
+               # Create tenure distribution chart
+               fig = px.bar(
+                   tenure_dist,
+                   x='Tenure',
+                   y='Count',
+                   title='Attorney Tenure Distribution',
+                   color='Count',
+                   color_continuous_scale='Blues'
+               )
+               
+               st.plotly_chart(fig, use_container_width=True)
+           
+           with col3:
+               # Active vs inactive attorneys
+               status_counts = retention_data['Still_Active'].value_counts().reset_index()
+               status_counts.columns = ['Status', 'Count']
+               status_counts['Status'] = status_counts['Status'].map({True: 'Active', False: 'Inactive'})
+               
+               fig = px.pie(
+                   status_counts,
+                   values='Count',
+                   names='Status',
+                   title='Attorney Status',
+                   color='Status',
+                   color_discrete_map={'Active': '#10B981', 'Inactive': '#EF4444'}
+               )
+               
+               st.plotly_chart(fig, use_container_width=True)
+       except Exception as e:
+           st.warning(f"Could not analyze attorney retention: {str(e)}")
+   else:
+       st.warning("Missing required columns for retention analysis")
+
+# 4. Invoice Explorer Tab
+with tab4:
+   st.markdown("<h2 class='section-header'>🧾 Invoice Explorer</h2>", unsafe_allow_html=True)
+   
+   # Create a searchable, filterable data table
+   st.subheader("Searchable Invoice Table")
+   
+   # Apply any additional filters specific to this tab
+   filtered_invoices = df_filtered.copy()
+   
+   # Search box
+   try:
+       search_term = st.text_input("Search (Client, Matter, Invoice Number)", key="invoice_search")
+       
+       if search_term:
+           # Create search mask
+           search_mask = pd.Series(False, index=filtered_invoices.index)
+           
+           # Search in relevant columns
+           search_columns = ['Client', 'Matter', 'Invoice_Number']
+           for col in search_columns:
+               if col in filtered_invoices.columns:
+                   search_mask |= filtered_invoices[col].astype(str).str.contains(search_term, case=False, na=False)
+           
+           filtered_invoices = filtered_invoices[search_mask]
+   except:
+       st.warning("Search functionality unavailable")
+   
+   # Display data table
+   try:
+       # Select columns to display
+       display_columns = [
+           'Invoice_Number', 'Invoice_Date', 'Client', 'Matter', 'Originator',
+           'Invoice_Total_in_USD', payment_col, 'Invoice_Balance_Due_in_USD',
+           'Last payment date', 'Days between Invoice date and last payment date'
+       ] if payment_col else [
+           'Invoice_Number', 'Invoice_Date', 'Client', 'Matter', 'Originator',
+           'Invoice_Total_in_USD', 'Invoice_Balance_Due_in_USD',
+           'Last payment date', 'Days between Invoice date and last payment date'
+       ]
+       
+       # Only include columns that exist
+       display_columns = [col for col in display_columns if col in filtered_invoices.columns]
+       
+       if not display_columns:
+           display_columns = filtered_invoices.columns.tolist()[:10]  # Show first 10 columns if none match
+       
+       # Show dataframe
+       st.dataframe(
+           filtered_invoices[display_columns],
+           use_container_width=True,
+           hide_index=True
+       )
+       
+       # Display record count
+       st.write(f"Showing {len(filtered_invoices)} of {len(df_filtered)} invoices")
+       
+       # Download options
+       col1, col2 = st.columns(2)
+       
+       with col1:
+           st.markdown(download_csv(filtered_invoices[display_columns]), unsafe_allow_html=True)
+       
+       with col2:
+           st.markdown(download_excel(filtered_invoices[display_columns]), unsafe_allow_html=True)
+   except Exception as e:
+       st.error(f"Error displaying invoice table: {str(e)}")
+
+# 5. Payment Behavior Tab
+with tab5:
+   st.markdown("<h2 class='section-header'>⏱️ Payment Behavior</h2>", unsafe_allow_html=True)
+   
+   # Average Payment Delay
+   st.subheader("Average Payment Delay")
+   
+   if ('Client' in df_filtered.columns and 
+       'Days between Invoice date and last payment date' in df_filtered.columns):
+       try:
+           # Filter rows with valid payment delay data
+           delay_df = df_filtered[df_filtered['Days between Invoice date and last payment date'] != 'Unpaid'].copy()
+           
+           if not delay_df.empty:
+               # Convert to numeric
+               delay_df['Delay_Days'] = pd.to_numeric(delay_df['Days between Invoice date and last payment date'], errors='coerce')
+               
+               # Calculate average by client
+               client_delay = delay_df.groupby('Client')['Delay_Days'].mean().reset_index()
+               client_delay.columns = ['Client', 'Avg_Delay_Days']
+               client_delay = client_delay.sort_values('Avg_Delay_Days', ascending=False)
+               
+               # Get top 10
+               top_delay = client_delay.head(10)
+               
+               if not top_delay.empty:
+                   # Create bar chart
+                   fig = px.bar(
+                       top_delay,
+                       x='Client',
+                       y='Avg_Delay_Days',
+                       title='Top 10 Clients by Average Payment Delay',
+                       labels={'Avg_Delay_Days': 'Average Delay (Days)', 'Client': 'Client'},
+                       color='Avg_Delay_Days',
+                       color_continuous_scale='Reds'
+                   )
+                   
+                   fig.update_layout(
+                       xaxis_tickangle=45,
+                       height=500
+                   )
+                   
+                   st.plotly_chart(fig, use_container_width=True)
+               else:
+                   st.warning("No delay data to display")
+           else:
+               st.warning("No payment delay data available")
+       except Exception as e:
+           st.warning(f"Could not analyze payment delays: {str(e)}")
+   else:
+       st.warning("Missing required columns for payment delay analysis")
+       
+# 6. Personnel Changes Tab
+with tab6:
+   st.markdown("<h2 class='section-header'>👥 Personnel Changes</h2>", unsafe_allow_html=True)
+   
+   # Show overview metrics
+   st.subheader("Personnel Changes Summary")
+   
+   # Calculate summary statistics by quarter and type
+   personnel_summary = create_personnel_summary(personnel_changes)
+   
+   # Display summary as cards
+   col1, col2 = st.columns(2)
+   
+   with col1:
+       # Display joiners summary
+       joiners_count = personnel_changes[personnel_changes['type'] == 'Joiner'].shape[0]
+       
+       # By quarter
+       q4_joiners = personnel_changes[(personnel_changes['type'] == 'Joiner') & 
+                                   (personnel_changes['quarter'] == 'Q4 2024')].shape[0]
+       q1_joiners = personnel_changes[(personnel_changes['type'] == 'Joiner') & 
+                                   (personnel_changes['quarter'] == 'Q1 2025')].shape[0]
+       
+       st.markdown(f"""
+       <div class='kpi-card'>
+           <p class='kpi-title'>Joiners</p>
+           <p class='kpi-value green-text'>{joiners_count}</p>
+           <p>Q4 2024: {q4_joiners} | Q1 2025: {q1_joiners}</p>
+       </div>
+       """, unsafe_allow_html=True)
+   
+   with col2:
+       # Display leavers summary
+       leavers_count = personnel_changes[personnel_changes['type'] == 'Leaver'].shape[0]
+       
+       # By quarter
+       q4_leavers = personnel_changes[(personnel_changes['type'] == 'Leaver') & 
+                                   (personnel_changes['quarter'] == 'Q4 2024')].shape[0]
+       q1_leavers = personnel_changes[(personnel_changes['type'] == 'Leaver') & 
+                                   (personnel_changes['quarter'] == 'Q1 2025')].shape[0]
+       
+       st.markdown(f"""
+       <div class='kpi-card'>
+           <p class='kpi-title'>Leavers</p>
+           <p class='kpi-value red-text'>{leavers_count}</p>
+           <p>Q4 2024: {q4_leavers} | Q1 2025: {q1_leavers}</p>
+       </div>
+       """, unsafe_allow_html=True)
+       
+   # Net change calculation
+   net_change = joiners_count - leavers_count
+   net_color = "green-text" if net_change > 0 else "red-text" if net_change < 0 else ""
+   
+   st.markdown(f"""
+   <div class='kpi-card'>
+       <p class='kpi-title'>Net Change (Q4 2024 - Q1 2025)</p>
+       <p class='kpi-value {net_color}'>{net_change:+d}</p>
+   </div>
+   """, unsafe_allow_html=True)
+   
+   # Create quarterly charts
+   st.subheader("Quarterly Personnel Changes")
+   
+   # Prepare data for chart
+   quarter_summary = personnel_summary.melt(
+       id_vars=['quarter'],
+       value_vars=['Joiner', 'Leaver'],
+       var_name='Type',
+       value_name='Count'
+   )
+   
+   # Create bar chart
+   fig = px.bar(
+       quarter_summary,
+       x='quarter',
+       y='Count',
+       color='Type',
+       barmode='group',
+       title='Personnel Changes by Quarter',
+       labels={'quarter': 'Quarter', 'Count': 'Number of Personnel', 'Type': 'Change Type'},
+       color_discrete_map={'Joiner': '#10B981', 'Leaver': '#EF4444'}
+   )
+   
+   fig.update_layout(height=400)
+   st.plotly_chart(fig, use_container_width=True)
+   
+   # Filter controls for personnel table
+   st.subheader("Personnel Changes Log")
+   
+   col1, col2 = st.columns(2)
+   
+   with col1:
+       # Quarter filter
+       quarters = ['All'] + list(personnel_changes['quarter'].unique())
+       selected_quarter = st.selectbox("Select Quarter", options=quarters)
+   
+   with col2:
+       # Change type filter
+       change_types = ['All', 'Joiner', 'Leaver']
+       selected_type = st.selectbox("Select Change Type", options=change_types)
+   
+   # Apply filters
+   filtered_quarter = None if selected_quarter == 'All' else selected_quarter
+   filtered_type = None if selected_type == 'All' else selected_type
+   
+   # Display personnel table
+   display_personnel_table(personnel_changes, quarter=filtered_quarter, change_type=filtered_type)
+   
+   # Notes and details
+   with st.expander("Details and Notes"):
+       st.markdown("""
+       ### Personnel Changes Notes
+       
+       This section displays officially recorded joiners and leavers as provided by HR/management.
+       
+       **Definitions:**
+       - **Joiners**: New attorneys or staff members who joined Rimon during the specified period.
+       - **Leavers**: Attorneys or staff members who left Rimon during the specified period.
+       - **PCT Team**: Patent Cooperation Treaty team members.
+       - **BOB**: Back Office Business team members.
+       
+       **Additional Information:**
+       - The "Did not originate" note indicates personnel who did not generate revenue as originators.
+       """)
+       
+   # Download personnel data
+   personnel_download = personnel_changes.copy()
+   personnel_download['date'] = personnel_download['date'].dt.strftime('%m/%d/%Y')
+   
+   # Create download buttons
+   st.subheader("Download Data")
+   
+   col1, col2 = st.columns(2)
+   
+   with col1:
+       st.markdown(download_csv(personnel_download), unsafe_allow_html=True)
+   
+   with col2:
+       st.markdown(download_excel(personnel_download), unsafe_allow_html=True)
+
+except Exception as e:
+   st.error(f"An error occurred in the dashboard: {str(e)}")
+   st.error(traceback.format_exc())
 
 # Run the main application
 if __name__ == "__main__":
-    main()
+   main()
