@@ -258,7 +258,7 @@ def get_attorney_performance(df, metric='invoice_total', top_n=10):
 # Removed password protection - simply display the title
 def display_title():
     # Display title
-    st.markdown("<h1 class='main-header'>Rimon Joiners and Leavers Dashboard</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='main-header'>Rimon Invoices Dashboard</h1>", unsafe_allow_html=True)
     return True
 
 # Find payment column
