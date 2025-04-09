@@ -12,7 +12,7 @@ import sys
 
 # Set page configuration
 st.set_page_config(
-    page_title="Rimon Joiners and Leavers Dashboard",
+    page_title="Rimon Invoices Dashboard",
     page_icon="⚖️",
     layout="wide",
     initial_sidebar_state="expanded"
